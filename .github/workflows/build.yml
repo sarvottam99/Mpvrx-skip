@@ -22,7 +22,7 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
-            - name: Build APK
+      - name: Build APK
         run: ./gradlew assembleDebug --no-daemon
 
       - name: Find APK
