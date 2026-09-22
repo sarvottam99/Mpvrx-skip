@@ -22,11 +22,17 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
-      - name: Build debug APK
+            - name: Build APK
         run: ./gradlew assembleDebug --no-daemon
+
+      - name: Find APK
+        run: |
+          echo "=== APK FILES ==="
+          find . -type f -name "*.apk" -print
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: mpvRx-skip-debug
-          path: app/build/outputs/apk/debug/*.apk
+          path: "**/*.apk"
+          if-no-files-found: error
