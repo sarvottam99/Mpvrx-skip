@@ -47,13 +47,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          sdkmanager --channel=3 \
-            "platforms;android-37" \
-            "build-tools;37.0.0" \
-            "ndk;27.3.13750724"
-
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.3.13750724" >> "$GITHUB_ENV"
-          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/27.3.13750724" >> "$GITHUB_ENV"
+          test -d "$ANDROID_NDK_HOME"
+          echo "Using Android NDK: $ANDROID_NDK_HOME"
+          "$ANDROID_NDK_HOME/ndk-build" --version
 
       - name: Install gomobile and gobind
         working-directory: tools/mkvgo-android
