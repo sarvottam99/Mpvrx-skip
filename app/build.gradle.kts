@@ -294,7 +294,7 @@ dependencies {
   implementation(libs.truetype.parser)
   implementation(libs.fsaf)
   implementation(libs.mediainfo.lib)
-  implementation(libs.ffmpeg.kit.full)
+  implementation(files("libs/mkvbridge.aar"))
   implementation(libs.androidx.profileinstaller)
   implementation(libs.google.cast.framework)
 

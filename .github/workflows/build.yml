@@ -15,7 +15,86 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  prepare-mkvbridge:
+    name: Build mkvbridge AAR
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Go 1.27
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.27'
+          cache: true
+          cache-dependency-path: tools/mkvgo-android/go.sum
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK and NDK
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sdkmanager \
+            "platforms;android-37" \
+            "build-tools;37.0.0" \
+            "ndk;27.3.13750724"
+
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.3.13750724" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/27.3.13750724" >> "$GITHUB_ENV"
+
+      - name: Install gomobile and gobind
+        working-directory: tools/mkvgo-android
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          go install golang.org/x/mobile/cmd/gomobile@v0.0.0-20261011034528-197770444867
+          go install golang.org/x/mobile/cmd/gobind@v0.0.0-20261011034528-197770444867
+
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Build mkvbridge AAR
+        working-directory: tools/mkvgo-android
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          go test ./...
+          gomobile init
+
+          mkdir -p "$GITHUB_WORKSPACE/app/libs"
+
+          gomobile bind \
+            -target=android \
+            -androidapi=26 \
+            -o "$GITHUB_WORKSPACE/app/libs/mkvbridge.aar" \
+            ./mkvbridge
+
+          test -s "$GITHUB_WORKSPACE/app/libs/mkvbridge.aar"
+          ls -lh "$GITHUB_WORKSPACE/app/libs/mkvbridge.aar"
+
+      - name: Upload mkvbridge AAR
+        uses: actions/upload-artifact@v7
+        with:
+          name: mkvbridge-aar
+          path: app/libs/mkvbridge.aar
+          if-no-files-found: error
+
   build:
+    needs: prepare-mkvbridge
     name: Build ${{ matrix.distribution.name }} APKs
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -50,6 +129,12 @@ jobs:
         with:
           # BuildConfig.GIT_COUNT and preview build identities rely on the real repository history.
           fetch-depth: 0
+
+      - name: Download mkvbridge AAR
+        uses: actions/download-artifact@v7
+        with:
+          name: mkvbridge-aar
+          path: app/libs
 
       - name: Generate build metadata
         id: metadata
