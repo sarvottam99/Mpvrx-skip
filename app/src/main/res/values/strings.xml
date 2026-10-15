@@ -789,9 +789,9 @@
   <string name="chapter_maker_change_folder">Change Folder</string>
   <string name="chapter_maker_chapter_name">Chapter name</string>
   <string name="chapter_maker_timing">Chapter timing</string>
-  <string name="chapter_maker_first">First part</string>
-  <string name="chapter_maker_last">Last part</string>
-  <string name="chapter_maker_specific_range">Specific range</string>
+  <string name="chapter_maker_first">For the first</string>
+  <string name="chapter_maker_last">For the last</string>
+  <string name="chapter_maker_specific_range">Specific timestamp</string>
   <string name="chapter_maker_processing">Processing…</string>
   <string name="chapter_maker_apply">Apply to Folder</string>
   <string name="subtitle_editor_title">Subtitle Editor</string>
