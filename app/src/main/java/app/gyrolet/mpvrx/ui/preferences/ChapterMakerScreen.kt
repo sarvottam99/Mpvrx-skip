@@ -130,11 +130,19 @@ object ChapterMakerScreen : Screen {
             ((parsePart(minutes) ?: 0) > 0 ||
               (parsePart(seconds) ?: 0) > 0)
 
-        "range" ->
-          (parsePart(startMinutes) ?: -1) >= 0 &&
-            (parsePart(startSeconds) ?: -1) in 0..59 &&
-            (parsePart(endMinutes) ?: -1) >= 0 &&
-            (parsePart(endSeconds) ?: -1) in 0..59
+        "range" -> {
+          val startMin = parsePart(startMinutes)
+          val startSec = parsePart(startSeconds)
+          val endMin = parsePart(endMinutes)
+          val endSec = parsePart(endSeconds)
+          startMin != null &&
+            startSec != null &&
+            startSec in 0..59 &&
+            endMin != null &&
+            endSec != null &&
+            endSec in 0..59 &&
+            endMin * 60 + endSec > startMin * 60 + startSec
+        }
 
         else -> false
       }
@@ -300,10 +308,10 @@ object ChapterMakerScreen : Screen {
                     context,
                     Uri.parse(folderUri),
                   )
-                    ?: error("Selected folder is no longer available")
+                    ?: kotlin.error("Selected folder is no longer available")
 
                 if (chapterName.isBlank()) {
-                  error("Chapter name cannot be empty")
+                  kotlin.error("Chapter name cannot be empty")
                   return@launch
                 }
 

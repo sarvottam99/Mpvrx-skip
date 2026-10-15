@@ -54,6 +54,21 @@ object BatchEditorFileUtils {
     return result
   }
 
+  fun <T> withReadableFileDescriptor(
+    context: Context,
+    file: DocumentFile,
+    block: (ParcelFileDescriptor) -> T,
+  ): T {
+    val pfd =
+      context.contentResolver.openFileDescriptor(
+        file.uri,
+        "r",
+      )
+        ?: error("Could not open ${file.name.orEmpty()} for reading")
+
+    return pfd.use(block)
+  }
+
   fun <T> withWritableFileDescriptor(
     context: Context,
     file: DocumentFile,

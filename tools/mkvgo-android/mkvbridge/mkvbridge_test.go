@@ -1,6 +1,9 @@
 package mkvbridge
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestChapterTimingFirst(t *testing.T) {
 	start, end, err := chapterTiming(
@@ -202,5 +205,43 @@ func TestChapterTimingRejectsNegativeRangeMinutes(t *testing.T) {
 	)
 	if err == nil {
 		t.Fatal("expected negative chapter minutes to be rejected")
+	}
+}
+
+func TestNeedsFullRewrite(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "metadata region too small",
+			err:  errors.New("new metadata exceeds available space - use full rewrite instead"),
+			want: true,
+		},
+		{
+			name: "unfillable one-byte gap",
+			err:  errors.New("new metadata leaves exactly 1 byte which no EBML element can fill"),
+			want: true,
+		},
+		{
+			name: "ordinary I/O error",
+			err:  errors.New("permission denied"),
+			want: false,
+		},
+		{
+			name: "nil error",
+			err:  nil,
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			if got := needsFullRewrite(tt.err); got != tt.want {
+				t.Fatalf("needsFullRewrite(%v) = %v, want %v", tt.err, got, tt.want)
+			}
+		})
 	}
 }

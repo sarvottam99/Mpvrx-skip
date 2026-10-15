@@ -5,6 +5,8 @@ import android.os.ParcelFileDescriptor
 import go.mkvbridge.Mkvbridge
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
 object BatchEditorBridge {

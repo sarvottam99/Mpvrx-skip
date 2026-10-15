@@ -106,7 +106,7 @@ object SubtitleEditorScreen : Screen {
         val root =
           withContext(Dispatchers.IO) {
             DocumentFile.fromTreeUri(context, uri)
-              ?: error("Selected folder is no longer available")
+              ?: kotlin.error("Selected folder is no longer available")
           }
 
         val files =
@@ -125,7 +125,7 @@ object SubtitleEditorScreen : Screen {
 
         val firstTracks =
           withContext(Dispatchers.IO) {
-            BatchEditorFileUtils.withWritableFileDescriptor(
+            BatchEditorFileUtils.withReadableFileDescriptor(
               context.applicationContext,
               files.first(),
             ) { pfd ->
@@ -384,7 +384,7 @@ object SubtitleEditorScreen : Screen {
                         context,
                         Uri.parse(folderUri),
                       )
-                        ?: error("Selected folder is no longer available")
+                        ?: kotlin.error("Selected folder is no longer available")
                     }
 
                   val files =

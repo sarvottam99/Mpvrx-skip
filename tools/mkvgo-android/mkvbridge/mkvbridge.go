@@ -144,7 +144,8 @@ func needsFullRewrite(err error) bool {
 
 	message := strings.ToLower(err.Error())
 	return strings.Contains(message, "use full rewrite instead") ||
-		strings.Contains(message, "does not fit existing region")
+		strings.Contains(message, "does not fit existing region") ||
+		strings.Contains(message, "which no ebml element can fill")
 }
 
 func copyAndroidFileToTemp(fd int64, path string) error {
