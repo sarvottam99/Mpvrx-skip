@@ -72,7 +72,6 @@ object BatchEditorScreen : Screen {
             .padding(padding),
       ) {
         item {
-          PreferenceSectionHeader(
             title = stringResource(R.string.batch_editor_title),
           )
         }
