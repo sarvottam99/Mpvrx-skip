@@ -1,8 +1,0 @@
-;FFMETADATA1
-title=Orange.Is.the.New.Black.S04E01.Work.That.Body.for.Me.1080p.WEBRip.10Bit.DDP2.0.HEVC-d3g
-encoder=Lavf63.1.102
-[CHAPTER]
-TIMEBASE=1/1000000000
-START=3144450000000
-END=3295520000000
-title=Chapter 2
