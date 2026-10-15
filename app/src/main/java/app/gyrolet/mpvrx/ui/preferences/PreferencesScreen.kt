@@ -321,7 +321,7 @@ object PreferencesScreen : Screen {
             SettingsDestination(
               title = stringResource(R.string.batch_editor_title),
               summary = stringResource(R.string.batch_editor_summary),
-              icon = Icons.RoundedFilled.Construction,
+              icon = Icons.RoundedFilled.Tune,
               screen = BatchEditorScreen,
             ),
           ),
