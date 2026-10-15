@@ -2830,7 +2830,8 @@ Files extracted: %4$d</string>
   <string name="chapter_maker_minutes">Minutes</string>
   <string name="chapter_maker_seconds">Seconds</string>
   <string name="chapter_maker_start">Start</string>
-  <string name="chapter_maker_end">End</string>
+  <string name="chapter_maker_end">To</string>
+  <string name="chapter_maker_end_of_file">End of file</string>
   <string name="chapter_maker_no_videos">No MKV/WebM videos found in this folder or its subfolders.</string>
   <string name="chapter_maker_progress">%1$d / %2$d: %3$s</string>
   <string name="chapter_maker_result">Completed: %1$d succeeded, %2$d failed</string>

@@ -26,6 +26,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -79,13 +80,14 @@ object ChapterMakerScreen : Screen {
     var chapterName by rememberSaveable { mutableStateOf("Intro") }
     var timingMode by rememberSaveable { mutableStateOf("first") }
 
-    var minutes by rememberSaveable { mutableStateOf("1") }
-    var seconds by rememberSaveable { mutableStateOf("18") }
+    var minutes by rememberSaveable { mutableStateOf("0") }
+    var seconds by rememberSaveable { mutableStateOf("0") }
 
-    var startMinutes by rememberSaveable { mutableStateOf("3") }
+    var startMinutes by rememberSaveable { mutableStateOf("0") }
     var startSeconds by rememberSaveable { mutableStateOf("0") }
-    var endMinutes by rememberSaveable { mutableStateOf("5") }
+    var endMinutes by rememberSaveable { mutableStateOf("0") }
     var endSeconds by rememberSaveable { mutableStateOf("0") }
+    var endAtDuration by rememberSaveable { mutableStateOf(false) }
 
     var running by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("") }
@@ -221,10 +223,11 @@ object ChapterMakerScreen : Screen {
           startMin != null &&
             startSec != null &&
             startSec in 0..59 &&
-            endMin != null &&
-            endSec != null &&
-            endSec in 0..59 &&
-            endMin * 60 + endSec > startMin * 60 + startSec
+            (endAtDuration ||
+              (endMin != null &&
+                endSec != null &&
+                endSec in 0..59 &&
+                endMin * 60 + endSec > startMin * 60 + startSec))
         }
 
         else -> false
@@ -367,14 +370,26 @@ object ChapterMakerScreen : Screen {
             enabled = !running,
           )
 
-          Text(context.getString(R.string.chapter_maker_end))
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+          ) {
+            Text(context.getString(R.string.chapter_maker_end))
+            Checkbox(
+              checked = endAtDuration,
+              onCheckedChange = { endAtDuration = it },
+              enabled = !running,
+            )
+            Text(context.getString(R.string.chapter_maker_end_of_file))
+          }
 
           TimeInputRow(
             minutes = endMinutes,
             seconds = endSeconds,
             onMinutesChange = { endMinutes = it },
             onSecondsChange = { endSeconds = it },
-            enabled = !running,
+            enabled = !running && !endAtDuration,
           )
         }
 
@@ -421,6 +436,7 @@ object ChapterMakerScreen : Screen {
                     startSeconds = parsePart(startSeconds) ?: 0,
                     endMinutes = parsePart(endMinutes) ?: 0,
                     endSeconds = parsePart(endSeconds) ?: 0,
+                    endAtDuration = endAtDuration,
                   )
 
                 var success = 0

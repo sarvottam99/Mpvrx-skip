@@ -29,6 +29,8 @@ object BatchEditorBridge {
     val endMinutes: Int = 0,
     @SerialName("end_seconds")
     val endSeconds: Int = 0,
+    @SerialName("end_at_duration")
+    val endAtDuration: Boolean = false,
   )
 
   @Serializable

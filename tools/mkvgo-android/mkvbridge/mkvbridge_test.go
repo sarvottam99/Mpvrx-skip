@@ -65,6 +65,30 @@ func TestChapterTimingRange(t *testing.T) {
 	}
 }
 
+func TestChapterTimingRangeToDuration(t *testing.T) {
+	for _, durationMs := range []int64{600000, 2700000} {
+		start, end, err := chapterTiming(
+			durationMs,
+			chapterRequest{
+				Mode:          "range",
+				StartMinutes:  1,
+				StartSeconds:  17,
+				EndAtDuration: true,
+			},
+		)
+
+		if err != nil {
+			t.Fatalf("duration %d: %v", durationMs, err)
+		}
+		if start != 77000 || end != durationMs {
+			t.Fatalf(
+				"duration %d: got %d -> %d, want 77000 -> %d",
+				durationMs, start, end, durationMs,
+			)
+		}
+	}
+}
+
 func TestChapterTimingClampsToDuration(t *testing.T) {
 	start, end, err := chapterTiming(
 		240000,

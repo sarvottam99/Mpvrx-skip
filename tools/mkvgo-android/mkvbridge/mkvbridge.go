@@ -15,14 +15,15 @@ import (
 )
 
 type chapterRequest struct {
-	Title        string `json:"title"`
-	Mode         string `json:"mode"`
-	Minutes      int    `json:"minutes"`
-	Seconds      int    `json:"seconds"`
-	StartMinutes int    `json:"start_minutes"`
-	StartSeconds int    `json:"start_seconds"`
-	EndMinutes   int    `json:"end_minutes"`
-	EndSeconds   int    `json:"end_seconds"`
+	Title         string `json:"title"`
+	Mode          string `json:"mode"`
+	Minutes       int    `json:"minutes"`
+	Seconds       int    `json:"seconds"`
+	StartMinutes  int    `json:"start_minutes"`
+	StartSeconds  int    `json:"start_seconds"`
+	EndMinutes    int    `json:"end_minutes"`
+	EndSeconds    int    `json:"end_seconds"`
+	EndAtDuration bool   `json:"end_at_duration"`
 }
 
 type subtitleEditRequest struct {
@@ -121,15 +122,26 @@ func chapterTiming(durationMs int64, req chapterRequest) (int64, int64, error) {
 		}
 
 	case "range":
-		if req.StartMinutes < 0 || req.EndMinutes < 0 {
-			return 0, 0, fmt.Errorf("chapter minutes cannot be negative")
+		if req.StartMinutes < 0 {
+			return 0, 0, fmt.Errorf("chapter start minutes cannot be negative")
 		}
-		if req.StartSeconds < 0 || req.StartSeconds > 59 ||
-			req.EndSeconds < 0 || req.EndSeconds > 59 {
-			return 0, 0, fmt.Errorf("chapter seconds must be between 0 and 59")
+		if req.StartSeconds < 0 || req.StartSeconds > 59 {
+			return 0, 0, fmt.Errorf("chapter start seconds must be between 0 and 59")
 		}
+
 		startMs = int64(req.StartMinutes)*60000 + int64(req.StartSeconds)*1000
-		endMs = int64(req.EndMinutes)*60000 + int64(req.EndSeconds)*1000
+
+		if req.EndAtDuration {
+			endMs = durationMs
+		} else {
+			if req.EndMinutes < 0 {
+				return 0, 0, fmt.Errorf("chapter end minutes cannot be negative")
+			}
+			if req.EndSeconds < 0 || req.EndSeconds > 59 {
+				return 0, 0, fmt.Errorf("chapter end seconds must be between 0 and 59")
+			}
+			endMs = int64(req.EndMinutes)*60000 + int64(req.EndSeconds)*1000
+		}
 
 	default:
 		return 0, 0, fmt.Errorf("invalid chapter timing mode: %s", req.Mode)
