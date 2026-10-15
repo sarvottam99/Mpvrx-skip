@@ -53,7 +53,18 @@ func dupFile(fd int64, path string) (*os.File, error) {
 		return nil, fmt.Errorf("duplicate file descriptor: %w", err)
 	}
 
-	return os.NewFile(uintptr(dup), path), nil
+	file := os.NewFile(uintptr(dup), path)
+	if file == nil {
+		syscall.Close(dup)
+		return nil, fmt.Errorf("create file from duplicated descriptor")
+	}
+
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		file.Close()
+		return nil, fmt.Errorf("seek duplicated file to start: %w", err)
+	}
+
+	return file, nil
 }
 
 func androidFS(fd int64) *matroska.FS {
