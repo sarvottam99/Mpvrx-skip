@@ -89,6 +89,7 @@ jobs:
 
           echo "Preparing mkvgo..."
           cd tools/mkvgo-android
+          go get -tool golang.org/x/mobile/cmd/gobind
           go mod tidy
 
           cd ../..
