@@ -109,3 +109,83 @@ func TestChapterTimingRejectsInvalidMode(t *testing.T) {
 		t.Fatal("expected invalid mode error")
 	}
 }
+
+func TestChapterTimingRejectsZeroLength(t *testing.T) {
+	_, _, err := chapterTiming(
+		600000,
+		chapterRequest{
+			Mode: "first",
+		},
+	)
+
+	if err == nil {
+		t.Fatal("expected zero-length chapter error")
+	}
+}
+
+func TestChapterTimingLastClampsRequestedLength(t *testing.T) {
+	start, end, err := chapterTiming(
+		60000,
+		chapterRequest{
+			Mode:    "last",
+			Minutes: 2,
+		},
+	)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if start != 0 || end != 60000 {
+		t.Fatalf("got %d -> %d, want 0 -> 60000", start, end)
+	}
+}
+
+func TestChapterTimingFirstClampsToDuration(t *testing.T) {
+	start, end, err := chapterTiming(
+		60000,
+		chapterRequest{
+			Mode:    "first",
+			Minutes: 2,
+		},
+	)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if start != 0 || end != 60000 {
+		t.Fatalf("got %d -> %d, want 0 -> 60000", start, end)
+	}
+}
+
+func TestChapterTimingLastClampsToDuration(t *testing.T) {
+	start, end, err := chapterTiming(
+		60000,
+		chapterRequest{
+			Mode:    "last",
+			Minutes: 2,
+		},
+	)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if start != 0 || end != 60000 {
+		t.Fatalf("got %d -> %d, want 0 -> 60000", start, end)
+	}
+}
+
+func TestChapterTimingRejectsZeroLength(t *testing.T) {
+	_, _, err := chapterTiming(
+		600000,
+		chapterRequest{
+			Mode: "first",
+		},
+	)
+
+	if err == nil {
+		t.Fatal("expected zero-length chapter error")
+	}
+}

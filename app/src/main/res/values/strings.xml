@@ -2814,4 +2814,36 @@ Files extracted: %4$d</string>
   <string name="onboarding_configuration_no_backup">Folder configured. Downloads will use Configuration/Downloads.</string>
   <string name="onboarding_configuration_restored">Restored settings from %1$s. Downloads will use Configuration/Downloads.</string>
   <string name="onboarding_configuration_restore_failed">Folder setup could not be completed: %1$s</string>
+
+  <!-- Batch Editor -->
+  <string name="batch_folder_not_selected">No folder selected</string>
+
+  <string name="chapter_maker_minutes">Minutes</string>
+  <string name="chapter_maker_seconds">Seconds</string>
+  <string name="chapter_maker_start">Start</string>
+  <string name="chapter_maker_end">End</string>
+  <string name="chapter_maker_no_videos">No MKV/WebM videos found in this folder or its subfolders.</string>
+  <string name="chapter_maker_progress">%1$d / %2$d: %3$s</string>
+  <string name="chapter_maker_result">Completed: %1$d succeeded, %2$d failed</string>
+
+  <string name="subtitle_editor_select_folder">Select Folder</string>
+  <string name="subtitle_editor_change_folder">Change Folder</string>
+  <string name="subtitle_editor_scanning">Scanning subtitle tracks…</string>
+  <string name="subtitle_editor_no_videos">No MKV/WebM videos found.</string>
+  <string name="subtitle_editor_scanned">Showing subtitle tracks from %1$s (%2$d videos found)</string>
+  <string name="subtitle_editor_tracks">Subtitle tracks</string>
+  <string name="subtitle_editor_track_number">Track %1$d — %2$s</string>
+  <string name="subtitle_editor_default_label">Default</string>
+  <string name="subtitle_editor_forced_label">Forced</string>
+  <string name="subtitle_editor_name">Subtitle name</string>
+  <string name="subtitle_editor_default">Default flag</string>
+  <string name="subtitle_editor_keep_default">Keep current default flag</string>
+  <string name="subtitle_editor_make_default">Make this subtitle default</string>
+  <string name="subtitle_editor_remove_default">Make this subtitle non-default</string>
+  <string name="subtitle_editor_position">New position</string>
+  <string name="subtitle_editor_processing">Processing…</string>
+  <string name="subtitle_editor_progress">%1$d / %2$d: %3$s</string>
+  <string name="subtitle_editor_result">Completed: %1$d succeeded, %2$d failed</string>
+  <string name="subtitle_editor_apply">Apply to Folder</string>
+
 </resources>

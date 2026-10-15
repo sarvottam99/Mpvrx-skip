@@ -9,16 +9,44 @@
 
 package app.gyrolet.mpvrx.ui.preferences
 
+import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import androidx.documentfile.provider.DocumentFile
 import app.gyrolet.mpvrx.R
 import app.gyrolet.mpvrx.presentation.Screen
 import app.gyrolet.mpvrx.ui.icons.Icon
@@ -26,21 +54,97 @@ import app.gyrolet.mpvrx.ui.icons.Icons
 import app.gyrolet.mpvrx.ui.utils.LocalBackStack
 import app.gyrolet.mpvrx.ui.utils.LocalShowSettingsBackArrow
 import app.gyrolet.mpvrx.ui.utils.popSafely
+import app.gyrolet.mpvrx.utils.batcheditor.BatchEditorBridge
+import app.gyrolet.mpvrx.utils.batcheditor.BatchEditorFileUtils
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 
 @Serializable
 object ChapterMakerScreen : Screen {
 
+  @OptIn(ExperimentalMaterial3Api::class)
   @Composable
   override fun Content() {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val backStack = LocalBackStack.current
+    val scope = rememberCoroutineScope()
+
+    var folderUri by rememberSaveable { mutableStateOf("") }
+    var folderName by rememberSaveable { mutableStateOf("") }
+
+    var chapterName by rememberSaveable { mutableStateOf("Intro") }
+    var timingMode by rememberSaveable { mutableStateOf("first") }
+
+    var minutes by rememberSaveable { mutableStateOf("1") }
+    var seconds by rememberSaveable { mutableStateOf("18") }
+
+    var startMinutes by rememberSaveable { mutableStateOf("3") }
+    var startSeconds by rememberSaveable { mutableStateOf("0") }
+    var endMinutes by rememberSaveable { mutableStateOf("5") }
+    var endSeconds by rememberSaveable { mutableStateOf("0") }
+
+    var running by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf("") }
+
+    val folderPicker =
+      rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
+      ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+
+        try {
+          context.contentResolver.takePersistableUriPermission(
+            uri,
+            Intent.FLAG_GRANT_READ_URI_PERMISSION or
+              Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+          )
+
+          folderUri = uri.toString()
+          folderName =
+            DocumentFile
+              .fromTreeUri(context, uri)
+              ?.name
+              ?: uri.lastPathSegment.orEmpty()
+
+          status = ""
+          error = ""
+        } catch (e: Exception) {
+          error = e.localizedMessage ?: "Could not access folder"
+        }
+      }
+
+    fun parsePart(value: String): Int? {
+      return value.toIntOrNull()?.takeIf { it >= 0 }
+    }
+
+    val timingValid =
+      when (timingMode) {
+        "first",
+        "last",
+        ->
+          (parsePart(minutes) ?: -1) >= 0 &&
+            (parsePart(seconds) ?: -1) in 0..59 &&
+            ((parsePart(minutes) ?: 0) > 0 ||
+              (parsePart(seconds) ?: 0) > 0)
+
+        "range" ->
+          (parsePart(startMinutes) ?: -1) >= 0 &&
+            (parsePart(startSeconds) ?: -1) in 0..59 &&
+            (parsePart(endMinutes) ?: -1) >= 0 &&
+            (parsePart(endSeconds) ?: -1) in 0..59
+
+        else -> false
+      }
 
     Scaffold(
       topBar = {
         TopAppBar(
           title = {
             Text(
-              text = stringResource(R.string.chapter_maker_title),
+              text = context.getString(R.string.chapter_maker_title),
               style = MaterialTheme.typography.headlineSmall,
               fontWeight = FontWeight.ExtraBold,
               color = MaterialTheme.colorScheme.primary,
@@ -62,10 +166,308 @@ object ChapterMakerScreen : Screen {
         )
       },
     ) { padding ->
-      Text(
-        text = stringResource(R.string.chapter_maker_summary),
-        modifier = Modifier.padding(padding),
-      )
+      Column(
+        modifier =
+          Modifier
+            .fillMaxSize()
+            .padding(padding)
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+      ) {
+        Text(
+          text = context.getString(R.string.chapter_maker_summary),
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        Text(
+          text =
+            folderName.ifBlank {
+              context.getString(R.string.batch_folder_not_selected)
+            },
+          style = MaterialTheme.typography.titleMedium,
+        )
+
+        OutlinedButton(
+          onClick = { folderPicker.launch(null) },
+          enabled = !running,
+          modifier = Modifier.fillMaxWidth(),
+        ) {
+          Icon(
+            Icons.RoundedFilled.Folder,
+            contentDescription = null,
+          )
+          Spacer(Modifier.size(8.dp))
+          Text(
+            if (folderUri.isBlank()) {
+              context.getString(R.string.chapter_maker_select_folder)
+            } else {
+              context.getString(R.string.chapter_maker_change_folder)
+            },
+          )
+        }
+
+        OutlinedTextField(
+          value = chapterName,
+          onValueChange = { chapterName = it },
+          modifier = Modifier.fillMaxWidth(),
+          label = {
+            Text(context.getString(R.string.chapter_maker_chapter_name))
+          },
+          singleLine = true,
+          enabled = !running,
+        )
+
+        Text(
+          text = context.getString(R.string.chapter_maker_timing),
+          style = MaterialTheme.typography.titleMedium,
+          fontWeight = FontWeight.SemiBold,
+        )
+
+        TimingOption(
+          selected = timingMode == "first",
+          text = context.getString(R.string.chapter_maker_first),
+          onClick = { timingMode = "first" },
+          enabled = !running,
+        )
+
+        if (timingMode == "first") {
+          TimeInputRow(
+            minutes = minutes,
+            seconds = seconds,
+            onMinutesChange = { minutes = it },
+            onSecondsChange = { seconds = it },
+            enabled = !running,
+          )
+        }
+
+        TimingOption(
+          selected = timingMode == "last",
+          text = context.getString(R.string.chapter_maker_last),
+          onClick = { timingMode = "last" },
+          enabled = !running,
+        )
+
+        if (timingMode == "last") {
+          TimeInputRow(
+            minutes = minutes,
+            seconds = seconds,
+            onMinutesChange = { minutes = it },
+            onSecondsChange = { seconds = it },
+            enabled = !running,
+          )
+        }
+
+        TimingOption(
+          selected = timingMode == "range",
+          text = context.getString(R.string.chapter_maker_specific_range),
+          onClick = { timingMode = "range" },
+          enabled = !running,
+        )
+
+        if (timingMode == "range") {
+          Text(context.getString(R.string.chapter_maker_start))
+
+          TimeInputRow(
+            minutes = startMinutes,
+            seconds = startSeconds,
+            onMinutesChange = { startMinutes = it },
+            onSecondsChange = { startSeconds = it },
+            enabled = !running,
+          )
+
+          Text(context.getString(R.string.chapter_maker_end))
+
+          TimeInputRow(
+            minutes = endMinutes,
+            seconds = endSeconds,
+            onMinutesChange = { endMinutes = it },
+            onSecondsChange = { endSeconds = it },
+            enabled = !running,
+          )
+        }
+
+        Button(
+          onClick = {
+            scope.launch {
+              running = true
+              status = context.getString(R.string.chapter_maker_processing)
+              error = ""
+
+              try {
+                val root =
+                  DocumentFile.fromTreeUri(
+                    context,
+                    Uri.parse(folderUri),
+                  )
+                    ?: error("Selected folder is no longer available")
+
+                if (chapterName.isBlank()) {
+                  error("Chapter name cannot be empty")
+                  return@launch
+                }
+
+                val files =
+                  withContext(Dispatchers.IO) {
+                    BatchEditorFileUtils.collectMatroskaVideos(root)
+                  }
+
+                if (files.isEmpty()) {
+                  error =
+                    context.getString(
+                      R.string.chapter_maker_no_videos,
+                    )
+                  return@launch
+                }
+
+                val request =
+                  BatchEditorBridge.ChapterRequest(
+                    title = chapterName.trim(),
+                    mode = timingMode,
+                    minutes = parsePart(minutes) ?: 0,
+                    seconds = parsePart(seconds) ?: 0,
+                    startMinutes = parsePart(startMinutes) ?: 0,
+                    startSeconds = parsePart(startSeconds) ?: 0,
+                    endMinutes = parsePart(endMinutes) ?: 0,
+                    endSeconds = parsePart(endSeconds) ?: 0,
+                  )
+
+                var success = 0
+                var failed = 0
+
+                files.forEachIndexed { index, file ->
+                  withContext(Dispatchers.Main.immediate) {
+                    status =
+                      context.getString(
+                        R.string.chapter_maker_progress,
+                        index + 1,
+                        files.size,
+                        file.name.orEmpty(),
+                      )
+                  }
+
+                  try {
+                    withContext(Dispatchers.IO) {
+                      BatchEditorFileUtils.withWritableFileDescriptor(
+                        context.applicationContext,
+                        file,
+                      ) { pfd ->
+                        BatchEditorBridge.editChapters(
+                          pfd,
+                          request,
+                        )
+                      }
+                    }
+                    success++
+                  } catch (_: Exception) {
+                    failed++
+                  }
+                }
+
+                status =
+                  context.getString(
+                    R.string.chapter_maker_result,
+                    success,
+                    failed,
+                  )
+              } catch (e: Exception) {
+                error = e.localizedMessage ?: "Chapter editing failed"
+              } finally {
+                running = false
+              }
+            }
+          },
+          enabled =
+            !running &&
+              folderUri.isNotBlank() &&
+              chapterName.isNotBlank() &&
+              timingValid,
+          modifier = Modifier.fillMaxWidth(),
+        ) {
+          Text(context.getString(R.string.chapter_maker_apply))
+        }
+
+        if (status.isNotBlank()) {
+          Text(
+            text = status,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+
+        if (error.isNotBlank()) {
+          Text(
+            text = error,
+            color = MaterialTheme.colorScheme.error,
+          )
+        }
+      }
     }
+  }
+}
+
+@Composable
+private fun TimingOption(
+  selected: Boolean,
+  text: String,
+  onClick: () -> Unit,
+  enabled: Boolean,
+) {
+  Row(
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    RadioButton(
+      selected = selected,
+      onClick = onClick,
+      enabled = enabled,
+    )
+    Text(text)
+  }
+}
+
+@Composable
+private fun TimeInputRow(
+  minutes: String,
+  seconds: String,
+  onMinutesChange: (String) -> Unit,
+  onSecondsChange: (String) -> Unit,
+  enabled: Boolean,
+) {
+  Row(
+    modifier = Modifier.fillMaxWidth(),
+    horizontalArrangement = Arrangement.spacedBy(8.dp),
+  ) {
+    OutlinedTextField(
+      value = minutes,
+      onValueChange = {
+        if (it.length <= 4 && it.all(Char::isDigit)) {
+          onMinutesChange(it)
+        }
+      },
+      modifier = Modifier.width(130.dp),
+      label = { Text("min") },
+      keyboardOptions =
+        KeyboardOptions(
+          keyboardType = KeyboardType.Number,
+        ),
+      singleLine = true,
+      enabled = enabled,
+    )
+
+    OutlinedTextField(
+      value = seconds,
+      onValueChange = {
+        if (it.length <= 2 && it.all(Char::isDigit)) {
+          onSecondsChange(it)
+        }
+      },
+      modifier = Modifier.width(130.dp),
+      label = { Text("sec") },
+      keyboardOptions =
+        KeyboardOptions(
+          keyboardType = KeyboardType.Number,
+        ),
+      singleLine = true,
+      enabled = enabled,
+    )
   }
 }

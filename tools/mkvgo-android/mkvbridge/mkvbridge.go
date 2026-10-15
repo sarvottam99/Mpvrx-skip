@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
+	"path/filepath"
 	"sort"
+	"strings"
 	"syscall"
 
 	"github.com/gravity-zero/mkvgo/matroska"
@@ -128,11 +131,163 @@ func chapterTiming(durationMs int64, req chapterRequest) (int64, int64, error) {
 	return startMs, endMs, nil
 }
 
-func EditChapters(fd int64, requestJSON string) error {
+func needsFullRewrite(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	message := strings.ToLower(err.Error())
+
+	return strings.Contains(message, "exceeds available space") ||
+		strings.Contains(message, "does not fit existing region") ||
+		strings.Contains(message, "plus the rebuilt seekhead exceeds available space")
+}
+
+func copyAndroidFileToTemp(fd int64, path string) error {
+	src, err := dupFile(fd, "android-source")
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	if _, err := src.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("seek source: %w", err)
+	}
+
+	dst, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("create temporary source: %w", err)
+	}
+
+	if _, err := io.Copy(dst, src); err != nil {
+		dst.Close()
+		return fmt.Errorf("copy source to temporary file: %w", err)
+	}
+
+	if err := dst.Close(); err != nil {
+		return fmt.Errorf("close temporary source: %w", err)
+	}
+
+	return nil
+}
+
+func copyTempFileToAndroid(fd int64, path string) error {
+	src, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("open rewritten file: %w", err)
+	}
+	defer src.Close()
+
+	dst, err := dupFile(fd, "android-destination")
+	if err != nil {
+		return err
+	}
+	defer dst.Close()
+
+	if _, err := src.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("seek rewritten file: %w", err)
+	}
+
+	if err := dst.Truncate(0); err != nil {
+		return fmt.Errorf("truncate destination: %w", err)
+	}
+
+	if _, err := dst.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("seek destination: %w", err)
+	}
+
+	if _, err := io.Copy(dst, src); err != nil {
+		return fmt.Errorf("copy rewritten file to destination: %w", err)
+	}
+
+	if err := dst.Sync(); err != nil {
+		return fmt.Errorf("sync destination: %w", err)
+	}
+
+	return nil
+}
+
+func fullRewrite(
+	fd int64,
+	tempDir string,
+	edit func(*matroska.Container),
+) error {
+	if tempDir == "" {
+		return fmt.Errorf("temporary directory is empty")
+	}
+
+	if err := os.MkdirAll(tempDir, 0700); err != nil {
+		return fmt.Errorf("create temporary directory: %w", err)
+	}
+
+	sourceFile, err := os.CreateTemp(tempDir, "mkvbridge-source-*.mkv")
+	if err != nil {
+		return fmt.Errorf("create temporary source: %w", err)
+	}
+	sourcePath := sourceFile.Name()
+	sourceFile.Close()
+	defer os.Remove(sourcePath)
+
+	outputFile, err := os.CreateTemp(tempDir, "mkvbridge-output-*.mkv")
+	if err != nil {
+		return fmt.Errorf("create temporary output: %w", err)
+	}
+	outputPath := outputFile.Name()
+	outputFile.Close()
+	defer os.Remove(outputPath)
+
+	if err := copyAndroidFileToTemp(fd, sourcePath); err != nil {
+		return err
+	}
+
+	if err := matroska.EditMetadata(
+		context.Background(),
+		sourcePath,
+		outputPath,
+		edit,
+	); err != nil {
+		return fmt.Errorf("full metadata rewrite: %w", err)
+	}
+
+	if err := copyTempFileToAndroid(fd, outputPath); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func editMetadata(
+	fd int64,
+	tempDir string,
+	edit func(*matroska.Container),
+) error {
+	err := matroska.EditInPlace(
+		context.Background(),
+		"android-document",
+		edit,
+		matroska.Options{
+			FS: androidFS(fd),
+		},
+	)
+
+	if err == nil {
+		return nil
+	}
+
+	if !needsFullRewrite(err) {
+		return err
+	}
+
+	return fullRewrite(fd, tempDir, edit)
+}
+
+func EditChapters(fd int64, tempDir string, requestJSON string) error {
 	var req chapterRequest
 	if err := json.Unmarshal([]byte(requestJSON), &req); err != nil {
 		return fmt.Errorf("invalid chapter request: %w", err)
 	}
+
+	req.Title = strings.TrimSpace(req.Title)
 
 	if req.Title == "" {
 		return fmt.Errorf("chapter name cannot be empty")
@@ -140,51 +295,44 @@ func EditChapters(fd int64, requestJSON string) error {
 
 	var timingErr error
 
-	err := matroska.EditInPlace(
-		context.Background(),
-		"android-document",
-		func(c *matroska.Container) {
-			var startMs, endMs int64
+	err := editMetadata(fd, tempDir, func(c *matroska.Container) {
+		var startMs, endMs int64
 
-			startMs, endMs, timingErr = chapterTiming(c.DurationMs, req)
-			if timingErr != nil {
-				return
-			}
+		startMs, endMs, timingErr = chapterTiming(c.DurationMs, req)
+		if timingErr != nil {
+			return
+		}
 
-			newChapter := matroska.Chapter{
-				Title:   req.Title,
-				StartMs: startMs,
-				EndMs:   endMs,
-			}
+		newChapter := matroska.Chapter{
+			Title:   req.Title,
+			StartMs: startMs,
+			EndMs:   endMs,
+		}
 
-			updated := make([]matroska.Chapter, 0, len(c.Chapters)+1)
-			replaced := false
+		updated := make([]matroska.Chapter, 0, len(c.Chapters)+1)
+		replaced := false
 
-			for _, chapter := range c.Chapters {
-				if chapter.Title == req.Title &&
-					chapter.StartMs == startMs &&
-					chapter.EndMs == endMs {
-					updated = append(updated, newChapter)
-					replaced = true
-				} else {
-					updated = append(updated, chapter)
-				}
-			}
-
-			if !replaced {
+		for _, chapter := range c.Chapters {
+			if chapter.Title == req.Title &&
+				chapter.StartMs == startMs &&
+				chapter.EndMs == endMs {
 				updated = append(updated, newChapter)
+				replaced = true
+			} else {
+				updated = append(updated, chapter)
 			}
+		}
 
-			sort.SliceStable(updated, func(i, j int) bool {
-				return updated[i].StartMs < updated[j].StartMs
-			})
+		if !replaced {
+			updated = append(updated, newChapter)
+		}
 
-			c.Chapters = updated
-		},
-		matroska.Options{
-			FS: androidFS(fd),
-		},
-	)
+		sort.SliceStable(updated, func(i, j int) bool {
+			return updated[i].StartMs < updated[j].StartMs
+		})
+
+		c.Chapters = updated
+	})
 
 	if err != nil {
 		return err
@@ -237,7 +385,7 @@ func InspectSubtitleTracks(fd int64) (string, error) {
 	return string(data), nil
 }
 
-func EditSubtitleTracks(fd int64, requestJSON string) error {
+func EditSubtitleTracks(fd int64, tempDir string, requestJSON string) error {
 	var req subtitleEditRequest
 	if err := json.Unmarshal([]byte(requestJSON), &req); err != nil {
 		return fmt.Errorf("invalid subtitle edit request: %w", err)
@@ -251,86 +399,115 @@ func EditSubtitleTracks(fd int64, requestJSON string) error {
 		return fmt.Errorf("subtitle position cannot be negative")
 	}
 
-	return matroska.EditInPlace(
-		context.Background(),
-		"android-document",
-		func(c *matroska.Container) {
-			subtitlePositions := make([]int, 0)
+	var editErr error
 
-			for i := range c.Tracks {
-				if c.Tracks[i].Type == matroska.SubtitleTrack {
-					subtitlePositions = append(subtitlePositions, i)
-				}
+	err := editMetadata(fd, tempDir, func(c *matroska.Container) {
+		subtitlePositions := make([]int, 0)
+
+		for i := range c.Tracks {
+			if c.Tracks[i].Type == matroska.SubtitleTrack {
+				subtitlePositions = append(subtitlePositions, i)
 			}
+		}
 
-			if req.SubtitleIndex > len(subtitlePositions) {
-				return
-			}
+		if req.SubtitleIndex > len(subtitlePositions) {
+			editErr = fmt.Errorf(
+				"subtitle track %d does not exist; file has %d subtitle tracks",
+				req.SubtitleIndex,
+				len(subtitlePositions),
+			)
+			return
+		}
 
-			target := subtitlePositions[req.SubtitleIndex-1]
+		target := subtitlePositions[req.SubtitleIndex-1]
 
-			if req.ChangeName {
-				c.Tracks[target].Name = req.Name
-			}
+		if req.ChangeName {
+			c.Tracks[target].Name = req.Name
+		}
 
-			switch req.DefaultMode {
-			case "default":
-				for _, pos := range subtitlePositions {
-					c.Tracks[pos].IsDefault = false
-				}
-				c.Tracks[target].IsDefault = true
-
-			case "not_default":
-				c.Tracks[target].IsDefault = false
-			}
-
-			if req.NewPosition < 1 ||
-				req.NewPosition > len(subtitlePositions) ||
-				req.NewPosition == req.SubtitleIndex {
-				return
-			}
-
-			subtitleTracks := make([]matroska.Track, 0, len(subtitlePositions))
-
+		switch req.DefaultMode {
+		case "default":
 			for _, pos := range subtitlePositions {
-				subtitleTracks = append(subtitleTracks, c.Tracks[pos])
+				c.Tracks[pos].IsDefault = false
 			}
+			c.Tracks[target].IsDefault = true
 
-			moved := subtitleTracks[req.SubtitleIndex-1]
+		case "not_default":
+			c.Tracks[target].IsDefault = false
+		}
 
-			remaining := make([]matroska.Track, 0, len(subtitleTracks)-1)
+		if req.NewPosition < 1 ||
+			req.NewPosition > len(subtitlePositions) ||
+			req.NewPosition == req.SubtitleIndex {
+			return
+		}
 
-			for i, track := range subtitleTracks {
-				if i != req.SubtitleIndex-1 {
-					remaining = append(remaining, track)
-				}
+		subtitleTracks := make(
+			[]matroska.Track,
+			0,
+			len(subtitlePositions),
+		)
+
+		for _, pos := range subtitlePositions {
+			subtitleTracks = append(
+				subtitleTracks,
+				c.Tracks[pos],
+			)
+		}
+
+		moved := subtitleTracks[req.SubtitleIndex-1]
+
+		remaining := make(
+			[]matroska.Track,
+			0,
+			len(subtitleTracks)-1,
+		)
+
+		for i, track := range subtitleTracks {
+			if i != req.SubtitleIndex-1 {
+				remaining = append(remaining, track)
 			}
+		}
 
-			insertAt := req.NewPosition - 1
+		insertAt := req.NewPosition - 1
 
-			reordered := make([]matroska.Track, 0, len(subtitleTracks))
-			remainingIndex := 0
+		reordered := make(
+			[]matroska.Track,
+			0,
+			len(subtitleTracks),
+		)
 
-			for i := 0; i < len(subtitleTracks); i++ {
-				if i == insertAt {
-					reordered = append(reordered, moved)
-				} else {
-					reordered = append(reordered, remaining[remainingIndex])
-					remainingIndex++
-				}
+		remainingIndex := 0
+
+		for i := 0; i < len(subtitleTracks); i++ {
+			if i == insertAt {
+				reordered = append(reordered, moved)
+			} else {
+				reordered = append(
+					reordered,
+					remaining[remainingIndex],
+				)
+				remainingIndex++
 			}
+		}
 
-			subtitleIndex := 0
+		subtitleIndex := 0
 
-			for i := range c.Tracks {
-				if c.Tracks[i].Type == matroska.SubtitleTrack {
-					c.Tracks[i] = reordered[subtitleIndex]
-					subtitleIndex++
-				}
+		for i := range c.Tracks {
+			if c.Tracks[i].Type == matroska.SubtitleTrack {
+				c.Tracks[i] = reordered[subtitleIndex]
+				subtitleIndex++
 			}
-		},
-		matroska.Options{
-			FS: androidFS(fd),
-		},
-	)
+		}
+	})
+
+	if err != nil {
+		return err
+	}
+
+	if editErr != nil {
+		return editErr
+	}
+
+	return nil
 }
