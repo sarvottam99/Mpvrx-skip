@@ -72,22 +72,17 @@ object BatchEditorScreen : Screen {
             .padding(padding),
       ) {
         item {
-            title = stringResource(R.string.batch_editor_title),
-          )
-        }
-
-        item {
           PreferenceCard {
             Preference(
-            title = {
-              Text(stringResource(R.string.chapter_maker_title))
-            },
-            summary = {
-              Text(
-                stringResource(R.string.chapter_maker_summary),
-                color = MaterialTheme.colorScheme.outline,
-              )
-            },
+              title = {
+                Text(stringResource(R.string.chapter_maker_title))
+              },
+              summary = {
+                Text(
+                  stringResource(R.string.chapter_maker_summary),
+                  color = MaterialTheme.colorScheme.outline,
+                )
+              },
               onClick = {
                 backStack.navigateTo(ChapterMakerScreen)
               },
@@ -98,15 +93,15 @@ object BatchEditorScreen : Screen {
         item {
           PreferenceCard {
             Preference(
-            title = {
-              Text(stringResource(R.string.subtitle_editor_title))
-            },
-            summary = {
-              Text(
-                stringResource(R.string.subtitle_editor_summary),
-                color = MaterialTheme.colorScheme.outline,
-              )
-            },
+              title = {
+                Text(stringResource(R.string.subtitle_editor_title))
+              },
+              summary = {
+                Text(
+                  stringResource(R.string.subtitle_editor_summary),
+                  color = MaterialTheme.colorScheme.outline,
+                )
+              },
               onClick = {
                 backStack.navigateTo(SubtitleEditorScreen)
               },

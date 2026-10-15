@@ -1,72 +1,70 @@
+/*
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ */
+
 package app.gyrolet.mpvrx.ui.preferences
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBack
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import app.gyrolet.mpvrx.ui.LocalShowSettingsBackArrow
-import app.gyrolet.mpvrx.ui.navigation.backStack
-import app.gyrolet.mpvrx.utils.navigation.popSafely
+import app.gyrolet.mpvrx.R
+import app.gyrolet.mpvrx.presentation.Screen
+import app.gyrolet.mpvrx.ui.icons.Icon
+import app.gyrolet.mpvrx.ui.icons.Icons
+import app.gyrolet.mpvrx.ui.utils.LocalBackStack
+import app.gyrolet.mpvrx.ui.utils.LocalShowSettingsBackArrow
+import app.gyrolet.mpvrx.ui.utils.popSafely
+import kotlinx.serialization.Serializable
 
-@Composable
-fun SubtitleEditorScreen() {
-  Scaffold(
-    topBar = {
-      TopAppBar(
-        title = {
-          Text(
-            text = "Subtitle Editor",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.ExtraBold,
-            color = MaterialTheme.colorScheme.primary,
-          )
-        },
-        navigationIcon = {
-          if (LocalShowSettingsBackArrow.current) {
-            IconButton(onClick = { backStack.popSafely() }) {
-              Icon(
-                Icons.Rounded.ArrowBack,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.secondary,
-              )
+@Serializable
+object SubtitleEditorScreen : Screen {
+
+  @Composable
+  override fun Content() {
+    val backStack = LocalBackStack.current
+
+    Scaffold(
+      topBar = {
+        TopAppBar(
+          title = {
+            Text(
+              text = stringResource(R.string.subtitle_editor_title),
+              style = MaterialTheme.typography.headlineSmall,
+              fontWeight = FontWeight.ExtraBold,
+              color = MaterialTheme.colorScheme.primary,
+            )
+          },
+          navigationIcon = {
+            if (LocalShowSettingsBackArrow.current) {
+              androidx.compose.material3.IconButton(
+                onClick = { backStack.popSafely() },
+              ) {
+                Icon(
+                  Icons.RoundedFilled.ArrowBack,
+                  contentDescription = null,
+                  tint = MaterialTheme.colorScheme.secondary,
+                )
+              }
             }
-          }
-        },
-      )
-    },
-  ) { padding ->
-    Column(
-      modifier =
-        Modifier
-          .fillMaxSize()
-          .verticalScroll(rememberScrollState())
-          .padding(padding)
-          .padding(16.dp),
-      verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
+          },
+        )
+      },
+    ) { padding ->
       Text(
-        text = "Subtitle Editor",
-        style = MaterialTheme.typography.titleLarge,
-      )
-
-      Text(
-        text = "Edit subtitle names, default flags, and track order recursively.",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        text = stringResource(R.string.subtitle_editor_summary),
+        modifier = Modifier.padding(padding),
       )
     }
   }
