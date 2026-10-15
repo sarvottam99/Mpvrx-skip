@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -32,6 +33,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -88,6 +90,7 @@ object ChapterMakerScreen : Screen {
     var running by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
+    var showWipeConfirmation by remember { mutableStateOf(false) }
 
     val folderPicker =
       rememberLauncherForActivityResult(
@@ -118,6 +121,86 @@ object ChapterMakerScreen : Screen {
 
     fun parsePart(value: String): Int? {
       return value.toIntOrNull()?.takeIf { it >= 0 }
+    }
+
+    fun startWipeChapters() {
+      if (folderUri.isBlank() || running) return
+      showWipeConfirmation = false
+
+      scope.launch {
+        running = true
+        status = context.getString(R.string.chapter_maker_processing)
+        error = ""
+
+        try {
+          val root =
+            DocumentFile.fromTreeUri(context, Uri.parse(folderUri))
+              ?: kotlin.error("Selected folder is no longer available")
+
+          val files =
+            withContext(Dispatchers.IO) {
+              BatchEditorFileUtils.collectMatroskaVideos(root)
+            }
+
+          if (files.isEmpty()) {
+            error = context.getString(R.string.chapter_maker_no_videos)
+            return@launch
+          }
+
+          var success = 0
+          var failed = 0
+          val failureDetails = mutableListOf<String>()
+
+          files.forEachIndexed { index, file ->
+            withContext(Dispatchers.Main.immediate) {
+              status = context.getString(
+                R.string.chapter_maker_progress,
+                index + 1,
+                files.size,
+                file.name.orEmpty(),
+              )
+            }
+
+            try {
+              withContext(Dispatchers.IO) {
+                BatchEditorFileUtils.withWritableFileDescriptor(
+                  context.applicationContext,
+                  file,
+                ) { pfd ->
+                  BatchEditorBridge.clearChapters(
+                    context.applicationContext,
+                    pfd,
+                  )
+                }
+              }
+              success++
+            } catch (e: Exception) {
+              failed++
+              if (failureDetails.size < 5) {
+                failureDetails +=
+                  "${file.name.orEmpty()}: ${e.localizedMessage ?: "Unknown error"}"
+              }
+            }
+          }
+
+          status = context.getString(
+            R.string.chapter_maker_result,
+            success,
+            failed,
+          )
+
+          if (failureDetails.isNotEmpty()) {
+            status += "\n" + failureDetails.joinToString("\n")
+            if (failed > failureDetails.size) {
+              status += "\n… and ${failed - failureDetails.size} more failure(s)"
+            }
+          }
+        } catch (e: Exception) {
+          error = e.localizedMessage ?: "Chapter wiping failed"
+        } finally {
+          running = false
+        }
+      }
     }
 
     val timingValid =
@@ -404,6 +487,44 @@ object ChapterMakerScreen : Screen {
           modifier = Modifier.fillMaxWidth(),
         ) {
           Text(context.getString(R.string.chapter_maker_apply))
+        }
+
+        OutlinedButton(
+          onClick = { showWipeConfirmation = true },
+          enabled = !running && folderUri.isNotBlank(),
+          modifier = Modifier.fillMaxWidth(),
+        ) {
+          Text(context.getString(R.string.chapter_maker_wipe_chapters))
+        }
+
+        if (showWipeConfirmation) {
+          AlertDialog(
+            onDismissRequest = {
+              if (!running) showWipeConfirmation = false
+            },
+            title = {
+              Text(context.getString(R.string.chapter_maker_wipe_title))
+            },
+            text = {
+              Text(context.getString(R.string.chapter_maker_wipe_message))
+            },
+            confirmButton = {
+              TextButton(
+                onClick = { startWipeChapters() },
+                enabled = !running,
+              ) {
+                Text(context.getString(R.string.chapter_maker_wipe_confirm))
+              }
+            },
+            dismissButton = {
+              TextButton(
+                onClick = { showWipeConfirmation = false },
+                enabled = !running,
+              ) {
+                Text(context.getString(android.R.string.cancel))
+              }
+            },
+          )
         }
 
         if (status.isNotBlank()) {

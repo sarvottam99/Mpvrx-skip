@@ -375,3 +375,42 @@ func TestChapterDuplicateStartCollapsesToOne(t *testing.T) {
 		t.Fatalf("duplicate start was not collapsed correctly: %+v", updated[0])
 	}
 }
+
+func TestChapterReplacementPreservesID(t *testing.T) {
+	existing := []matroska.Chapter{
+		{ID: 123, Title: "Chapter 1", StartMs: 0, EndMs: 3240000},
+		{ID: 456, Title: "Chapter 2", StartMs: 3144450, EndMs: 3295520},
+	}
+
+	result := upsertChapter(existing, matroska.Chapter{
+		Title: "Intro", StartMs: 0, EndMs: 77000,
+	})
+
+	if len(result) != 2 {
+		t.Fatalf("got %d chapters, want 2", len(result))
+	}
+	if result[0].ID != 123 || result[0].Title != "Intro" || result[0].EndMs != 77000 {
+		t.Fatalf("replacement incorrect: %+v", result[0])
+	}
+	if result[1].ID != 456 || result[1].Title != "Chapter 2" {
+		t.Fatalf("existing chapter changed: %+v", result[1])
+	}
+}
+
+func TestChapterInsertGetsUniqueNonzeroID(t *testing.T) {
+	existing := []matroska.Chapter{
+		{ID: 123, Title: "Chapter 1", StartMs: 0},
+		{ID: 456, Title: "Chapter 2", StartMs: 3144450},
+	}
+
+	result := upsertChapter(existing, matroska.Chapter{
+		Title: "Intro", StartMs: 77000, EndMs: 120000,
+	})
+
+	if len(result) != 3 {
+		t.Fatalf("got %d chapters, want 3", len(result))
+	}
+	if result[1].ID == 0 || result[1].ID == 123 || result[1].ID == 456 {
+		t.Fatalf("new chapter ID is not unique and nonzero: %d", result[1].ID)
+	}
+}

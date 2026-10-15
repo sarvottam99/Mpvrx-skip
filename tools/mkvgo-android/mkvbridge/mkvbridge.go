@@ -333,6 +333,26 @@ func editMetadata(
 	return fullRewrite(fd, tempDir, edit)
 }
 
+func nextChapterID(chapters []matroska.Chapter) uint64 {
+	var maxID uint64
+
+	var scan func([]matroska.Chapter)
+	scan = func(items []matroska.Chapter) {
+		for _, chapter := range items {
+			if chapter.ID > maxID {
+				maxID = chapter.ID
+			}
+			scan(chapter.SubChapters)
+		}
+	}
+	scan(chapters)
+
+	if maxID == ^uint64(0) {
+		return 1
+	}
+	return maxID + 1
+}
+
 func upsertChapter(chapters []matroska.Chapter, newChapter matroska.Chapter) []matroska.Chapter {
 	updated := make([]matroska.Chapter, 0, len(chapters)+1)
 	replaced := false
@@ -340,6 +360,10 @@ func upsertChapter(chapters []matroska.Chapter, newChapter matroska.Chapter) []m
 	for _, chapter := range chapters {
 		if chapter.StartMs == newChapter.StartMs {
 			if !replaced {
+				newChapter.ID = chapter.ID
+				if newChapter.ID == 0 {
+					newChapter.ID = nextChapterID(chapters)
+				}
 				updated = append(updated, newChapter)
 				replaced = true
 			}
@@ -350,6 +374,7 @@ func upsertChapter(chapters []matroska.Chapter, newChapter matroska.Chapter) []m
 	}
 
 	if !replaced {
+		newChapter.ID = nextChapterID(chapters)
 		updated = append(updated, newChapter)
 	}
 
@@ -395,6 +420,14 @@ func EditChapters(fd int64, tempDir string, requestJSON string) error {
 		}
 
 		c.Chapters = upsertChapter(c.Chapters, newChapter)
+	})
+}
+
+// ClearChapters removes all chapter entries while preserving tracks
+// and other Matroska metadata.
+func ClearChapters(fd int64, tempDir string) error {
+	return editMetadata(fd, tempDir, func(c *matroska.Container) {
+		c.Chapters = nil
 	})
 }
 

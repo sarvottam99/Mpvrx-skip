@@ -69,6 +69,16 @@ object BatchEditorBridge {
     )
   }
 
+  fun clearChapters(
+    context: Context,
+    pfd: ParcelFileDescriptor,
+  ) {
+    Mkvbridge.clearChapters(
+      pfd.fd.toLong(),
+      context.cacheDir.absolutePath,
+    )
+  }
+
   fun inspectSubtitleTracks(
     pfd: ParcelFileDescriptor,
   ): List<SubtitleTrack> {
