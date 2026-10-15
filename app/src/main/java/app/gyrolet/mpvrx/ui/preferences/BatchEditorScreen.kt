@@ -30,6 +30,7 @@ import app.gyrolet.mpvrx.ui.utils.navigateTo
 import app.gyrolet.mpvrx.ui.utils.popSafely
 import kotlinx.serialization.Serializable
 import me.zhanghai.compose.preference.Preference
+import me.zhanghai.compose.preference.ProvidePreferenceLocals
 
 @Serializable
 object BatchEditorScreen : Screen {
@@ -65,47 +66,49 @@ object BatchEditorScreen : Screen {
         )
       },
     ) { padding ->
-      LazyColumn(
-        modifier =
-          Modifier
-            .fillMaxSize()
-            .padding(padding),
-      ) {
-        item {
-          PreferenceCard {
-            Preference(
-              title = {
-                Text(stringResource(R.string.chapter_maker_title))
-              },
-              summary = {
-                Text(
-                  stringResource(R.string.chapter_maker_summary),
-                  color = MaterialTheme.colorScheme.outline,
-                )
-              },
-              onClick = {
-                backStack.navigateTo(ChapterMakerScreen)
-              },
-            )
+      ProvidePreferenceLocals {
+        LazyColumn(
+          modifier =
+            Modifier
+              .fillMaxSize()
+              .padding(padding),
+        ) {
+          item {
+            PreferenceCard {
+              Preference(
+                title = {
+                  Text(stringResource(R.string.chapter_maker_title))
+                },
+                summary = {
+                  Text(
+                    stringResource(R.string.chapter_maker_summary),
+                    color = MaterialTheme.colorScheme.outline,
+                  )
+                },
+                onClick = {
+                  backStack.navigateTo(ChapterMakerScreen)
+                },
+              )
+            }
           }
-        }
 
-        item {
-          PreferenceCard {
-            Preference(
-              title = {
-                Text(stringResource(R.string.subtitle_editor_title))
-              },
-              summary = {
-                Text(
-                  stringResource(R.string.subtitle_editor_summary),
-                  color = MaterialTheme.colorScheme.outline,
-                )
-              },
-              onClick = {
-                backStack.navigateTo(SubtitleEditorScreen)
-              },
-            )
+          item {
+            PreferenceCard {
+              Preference(
+                title = {
+                  Text(stringResource(R.string.subtitle_editor_title))
+                },
+                summary = {
+                  Text(
+                    stringResource(R.string.subtitle_editor_summary),
+                    color = MaterialTheme.colorScheme.outline,
+                  )
+                },
+                onClick = {
+                  backStack.navigateTo(SubtitleEditorScreen)
+                },
+              )
+            }
           }
         }
       }
