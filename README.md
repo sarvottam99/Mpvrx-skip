@@ -15,9 +15,21 @@
 - No need to rename media files just to provide an IMDb ID.
 - Uses **Wikidata** to resolve the IMDb ID from the TMDB ID.
 
+### Batch Subtitle Editor
+
+- Rename subtitle tracks, change the default subtitle flag, and reorder subtitle tracks across multiple MKV files.
+
+### Batch Chapter Maker
+
+- Create, edit, and wipe chapters across multiple MKV files, with support for specific ranges and ending chapters at the end of each file.
+
+### mkvgo
+
+- Integrated **mkvgo** for MKV processing and editing.
+
 ### Recursive RAR Extractor
 
-- Recursive RAR Extractor under Storage section in Settings. It is for easy extraction of scene releases with multiple subfolders and multi-part rar archives.
+- Recursively extracts scene releases with nested subfolders and multi-part RAR archives.
 
 The rest of the player remains based on the upstream **mpvRx** project.
 
