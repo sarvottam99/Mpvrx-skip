@@ -295,12 +295,6 @@ object PreferencesScreen : Screen {
               icon = Icons.RoundedFilled.Folder,
               screen = FoldersPreferencesScreen,
             ),
-            SettingsDestination(
-              title = stringResource(R.string.pref_rar_extractor_title),
-              summary = stringResource(R.string.pref_rar_extractor_summary),
-              icon = Icons.RoundedFilled.Folder,
-              screen = RecursiveRarExtractorScreen,
-            ),
             if (!isSecureFolderEntryHidden) {
               SettingsDestination(
                 title = stringResource(R.string.secure_folder_title),
@@ -311,6 +305,25 @@ object PreferencesScreen : Screen {
             } else {
               null
             },
+          ),
+      ),
+      SettingsSection(
+        title = stringResource(R.string.pref_section_utilities),
+        tint = colorScheme.onSurfaceVariant,
+        items =
+          listOf(
+            SettingsDestination(
+              title = stringResource(R.string.pref_rar_extractor_title),
+              summary = stringResource(R.string.pref_rar_extractor_summary),
+              icon = Icons.RoundedFilled.Folder,
+              screen = RecursiveRarExtractorScreen,
+            ),
+            SettingsDestination(
+              title = stringResource(R.string.batch_editor_title),
+              summary = stringResource(R.string.batch_editor_summary),
+              icon = Icons.RoundedFilled.Build,
+              screen = BatchEditorScreen,
+            ),
           ),
       ),
       SettingsSection(

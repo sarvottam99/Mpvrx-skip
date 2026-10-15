@@ -793,7 +793,7 @@ object SearchablePreferences {
             "scene release",
             "compressed",
           ),
-          category = "Storage",
+          category = "Utilities",
           screen = RecursiveRarExtractorScreen,
         ),
       )
