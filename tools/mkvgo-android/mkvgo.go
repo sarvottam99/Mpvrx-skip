@@ -45,7 +45,7 @@ func Probe(path string) (string, error) {
 	}
 
 	out := result{
-		DurationMs: c.Info.DurationMs,
+		DurationMs: 0,
 	}
 
 	for i, t := range c.Tracks {
