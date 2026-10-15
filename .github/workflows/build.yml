@@ -68,6 +68,44 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      - name: Set up Go 1.27
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.x'
+          cache-dependency-path: tools/mkvgo-android/go.mod
+
+      - name: Generate mkvgo Android AAR
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Installing gomobile..."
+          go install golang.org/x/mobile/cmd/gomobile@latest
+
+          export PATH="$(go env GOPATH)/bin:$PATH"
+
+          echo "Initializing gomobile..."
+          gomobile init
+
+          echo "Preparing mkvgo..."
+          cd tools/mkvgo-android
+          go mod tidy
+
+          cd ../..
+
+          mkdir -p app/libs
+
+          echo "Generating mkvgo Android AAR..."
+          gomobile bind \
+            -target=android \
+            -androidapi 26 \
+            -javapkg=app.gyrolet.mpvrx.mkvgo \
+            -o app/libs/mkvgo-android.aar \
+            ./tools/mkvgo-android
+
+          echo "Generated:"
+          ls -lh app/libs/mkvgo-android.aar
+
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
