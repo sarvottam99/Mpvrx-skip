@@ -2,7 +2,7 @@ package app.gyrolet.mpvrx.utils.batcheditor
 
 import android.content.Context
 import android.os.ParcelFileDescriptor
-import go.mkvbridge.Mkvbridge
+import mkvbridge.Mkvbridge
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString

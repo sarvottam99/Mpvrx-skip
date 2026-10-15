@@ -785,6 +785,15 @@
   <string name="batch_editor_summary">Batch tools for chapters and subtitle tracks</string>
   <string name="chapter_maker_title">Chapter Maker</string>
   <string name="chapter_maker_summary">Add chapters to videos in a folder and its subfolders</string>
+  <string name="chapter_maker_select_folder">Select Folder</string>
+  <string name="chapter_maker_change_folder">Change Folder</string>
+  <string name="chapter_maker_chapter_name">Chapter name</string>
+  <string name="chapter_maker_timing">Chapter timing</string>
+  <string name="chapter_maker_first">First part</string>
+  <string name="chapter_maker_last">Last part</string>
+  <string name="chapter_maker_specific_range">Specific range</string>
+  <string name="chapter_maker_processing">Processing…</string>
+  <string name="chapter_maker_apply">Apply to Folder</string>
   <string name="subtitle_editor_title">Subtitle Editor</string>
   <string name="subtitle_editor_summary">Edit subtitle names, defaults, and track order</string>
   <string name="pref_rar_extractor_title">Recursive RAR Extractor</string>
