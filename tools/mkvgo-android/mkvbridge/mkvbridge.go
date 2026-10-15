@@ -333,6 +333,33 @@ func editMetadata(
 	return fullRewrite(fd, tempDir, edit)
 }
 
+func upsertChapter(chapters []matroska.Chapter, newChapter matroska.Chapter) []matroska.Chapter {
+	updated := make([]matroska.Chapter, 0, len(chapters)+1)
+	replaced := false
+
+	for _, chapter := range chapters {
+		if chapter.StartMs == newChapter.StartMs {
+			if !replaced {
+				updated = append(updated, newChapter)
+				replaced = true
+			}
+			continue
+		}
+
+		updated = append(updated, chapter)
+	}
+
+	if !replaced {
+		updated = append(updated, newChapter)
+	}
+
+	sort.SliceStable(updated, func(i, j int) bool {
+		return updated[i].StartMs < updated[j].StartMs
+	})
+
+	return updated
+}
+
 func EditChapters(fd int64, tempDir string, requestJSON string) error {
 	var req chapterRequest
 	if err := json.Unmarshal([]byte(requestJSON), &req); err != nil {
@@ -367,26 +394,7 @@ func EditChapters(fd int64, tempDir string, requestJSON string) error {
 			EndMs:   endMs,
 		}
 
-		updated := make([]matroska.Chapter, 0, len(c.Chapters)+1)
-		replaced := false
-		for _, chapter := range c.Chapters {
-			if chapter.Title == req.Title &&
-				chapter.StartMs == startMs &&
-				chapter.EndMs == endMs {
-				updated = append(updated, newChapter)
-				replaced = true
-			} else {
-				updated = append(updated, chapter)
-			}
-		}
-		if !replaced {
-			updated = append(updated, newChapter)
-		}
-
-		sort.SliceStable(updated, func(i, j int) bool {
-			return updated[i].StartMs < updated[j].StartMs
-		})
-		c.Chapters = updated
+		c.Chapters = upsertChapter(c.Chapters, newChapter)
 	})
 }
 

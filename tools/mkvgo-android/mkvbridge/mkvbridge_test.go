@@ -2,6 +2,7 @@ package mkvbridge
 
 import (
 	"errors"
+	"github.com/gravity-zero/mkvgo/matroska"
 	"testing"
 )
 
@@ -243,5 +244,134 @@ func TestNeedsFullRewrite(t *testing.T) {
 				t.Fatalf("needsFullRewrite(%v) = %v, want %v", tt.err, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestChapterReplacementAtExistingStart(t *testing.T) {
+	chapters := []matroska.Chapter{
+		{
+			Title:   "Intro",
+			StartMs: 0,
+			EndMs:   3240000,
+		},
+		{
+			Title:   "Chapter 2",
+			StartMs: 3144450,
+			EndMs:   3295000,
+		},
+	}
+
+	newChapter := matroska.Chapter{
+		Title:   "Intro",
+		StartMs: 0,
+		EndMs:   77000,
+	}
+
+	updated := upsertChapter(chapters, newChapter)
+
+	if len(updated) != 2 {
+		t.Fatalf("got %d chapters, want 2", len(updated))
+	}
+
+	if updated[0].Title != "Intro" ||
+		updated[0].StartMs != 0 ||
+		updated[0].EndMs != 77000 {
+		t.Fatalf("first chapter was not replaced correctly: %+v", updated[0])
+	}
+
+	if updated[1].Title != "Chapter 2" ||
+		updated[1].StartMs != 3144450 {
+		t.Fatalf("existing second chapter was changed: %+v", updated[1])
+	}
+}
+
+func TestChapterInsertWhenStartDoesNotExist(t *testing.T) {
+	chapters := []matroska.Chapter{
+		{
+			Title:   "Chapter 1",
+			StartMs: 0,
+			EndMs:   100000,
+		},
+		{
+			Title:   "Chapter 2",
+			StartMs: 3144450,
+			EndMs:   3295000,
+		},
+	}
+
+	newChapter := matroska.Chapter{
+		Title:   "Intro",
+		StartMs: 77000,
+		EndMs:   120000,
+	}
+
+	updated := upsertChapter(chapters, newChapter)
+
+	if len(updated) != 3 {
+		t.Fatalf("got %d chapters, want 3", len(updated))
+	}
+
+	if updated[1].Title != "Intro" ||
+		updated[1].StartMs != 77000 ||
+		updated[1].EndMs != 120000 {
+		t.Fatalf("new chapter was not inserted correctly: %+v", updated[1])
+	}
+}
+
+func TestChapterInsertWithNoExistingChapters(t *testing.T) {
+	newChapter := matroska.Chapter{
+		Title:   "Intro",
+		StartMs: 0,
+		EndMs:   77000,
+	}
+
+	updated := upsertChapter(nil, newChapter)
+
+	if len(updated) != 1 {
+		t.Fatalf("got %d chapters, want 1", len(updated))
+	}
+
+	if updated[0].Title != "Intro" ||
+		updated[0].StartMs != 0 ||
+		updated[0].EndMs != 77000 {
+		t.Fatalf("chapter was not inserted correctly: %+v", updated[0])
+	}
+}
+
+func TestChapterDuplicateStartCollapsesToOne(t *testing.T) {
+	chapters := []matroska.Chapter{
+		{
+			Title:   "Old Intro",
+			StartMs: 0,
+			EndMs:   60000,
+		},
+		{
+			Title:   "Duplicate Intro",
+			StartMs: 0,
+			EndMs:   70000,
+		},
+		{
+			Title:   "Chapter 2",
+			StartMs: 3144450,
+			EndMs:   3295000,
+		},
+	}
+
+	newChapter := matroska.Chapter{
+		Title:   "Intro",
+		StartMs: 0,
+		EndMs:   77000,
+	}
+
+	updated := upsertChapter(chapters, newChapter)
+
+	if len(updated) != 2 {
+		t.Fatalf("got %d chapters, want 2", len(updated))
+	}
+
+	if updated[0].Title != "Intro" ||
+		updated[0].StartMs != 0 ||
+		updated[0].EndMs != 77000 {
+		t.Fatalf("duplicate start was not collapsed correctly: %+v", updated[0])
 	}
 }
