@@ -408,6 +408,7 @@ object SubtitleEditorScreen : Screen {
 
                   var success = 0
                   var failed = 0
+                  val failureDetails = mutableListOf<String>()
 
                   val request =
                     BatchEditorBridge.SubtitleEditRequest(
@@ -436,14 +437,18 @@ object SubtitleEditorScreen : Screen {
                           file,
                         ) { pfd ->
                           BatchEditorBridge.editSubtitleTracks(
-                            pfd,
-                            request,
-                          )
+                          context.applicationContext,
+                          pfd,
+                          request,
+                        )
                         }
                       }
                       success++
-                    } catch (_: Exception) {
+                    } catch (e: Exception) {
                       failed++
+                      if (failureDetails.size < 5) {
+                        failureDetails += "${file.name.orEmpty()}: ${e.localizedMessage ?: "Unknown error"}"
+                      }
                     }
                   }
 
@@ -453,6 +458,12 @@ object SubtitleEditorScreen : Screen {
                       success,
                       failed,
                     )
+                  if (failureDetails.isNotEmpty()) {
+                    status += "\n" + failureDetails.joinToString("\n")
+                    if (failed > failureDetails.size) {
+                      status += "\n… and ${failed - failureDetails.size} more failure(s)"
+                    }
+                  }
                 } catch (e: Exception) {
                   error = e.localizedMessage ?: "Subtitle editing failed"
                 } finally {
@@ -469,6 +480,13 @@ object SubtitleEditorScreen : Screen {
           ) {
             Text(context.getString(R.string.subtitle_editor_apply))
           }
+        }
+
+        if (status.isNotBlank()) {
+          Text(
+            text = status,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
         }
 
         if (error.isNotBlank()) {

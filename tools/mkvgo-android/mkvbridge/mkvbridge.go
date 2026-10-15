@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"syscall"
@@ -86,29 +85,38 @@ func chapterTiming(durationMs int64, req chapterRequest) (int64, int64, error) {
 	var startMs, endMs int64
 
 	switch req.Mode {
-	case "first":
+	case "first", "last":
+		if req.Minutes < 0 {
+			return 0, 0, fmt.Errorf("chapter minutes cannot be negative")
+		}
+		if req.Seconds < 0 || req.Seconds > 59 {
+			return 0, 0, fmt.Errorf("chapter seconds must be between 0 and 59")
+		}
+
 		lengthMs := int64(req.Minutes)*60000 + int64(req.Seconds)*1000
 		if lengthMs <= 0 {
 			return 0, 0, fmt.Errorf("chapter duration must be greater than zero")
 		}
 
-		startMs = 0
-		endMs = lengthMs
-
-	case "last":
-		lengthMs := int64(req.Minutes)*60000 + int64(req.Seconds)*1000
-		if lengthMs <= 0 {
-			return 0, 0, fmt.Errorf("chapter duration must be greater than zero")
+		if req.Mode == "first" {
+			startMs = 0
+			endMs = lengthMs
+		} else {
+			if lengthMs > durationMs {
+				lengthMs = durationMs
+			}
+			startMs = durationMs - lengthMs
+			endMs = durationMs
 		}
-
-		if lengthMs > durationMs {
-			lengthMs = durationMs
-		}
-
-		startMs = durationMs - lengthMs
-		endMs = durationMs
 
 	case "range":
+		if req.StartMinutes < 0 || req.EndMinutes < 0 {
+			return 0, 0, fmt.Errorf("chapter minutes cannot be negative")
+		}
+		if req.StartSeconds < 0 || req.StartSeconds > 59 ||
+			req.EndSeconds < 0 || req.EndSeconds > 59 {
+			return 0, 0, fmt.Errorf("chapter seconds must be between 0 and 59")
+		}
 		startMs = int64(req.StartMinutes)*60000 + int64(req.StartSeconds)*1000
 		endMs = int64(req.EndMinutes)*60000 + int64(req.EndSeconds)*1000
 
@@ -119,11 +127,9 @@ func chapterTiming(durationMs int64, req chapterRequest) (int64, int64, error) {
 	if startMs < 0 {
 		startMs = 0
 	}
-
 	if endMs > durationMs {
 		endMs = durationMs
 	}
-
 	if endMs <= startMs {
 		return 0, 0, fmt.Errorf("chapter end time must be after start time")
 	}
@@ -137,10 +143,8 @@ func needsFullRewrite(err error) bool {
 	}
 
 	message := strings.ToLower(err.Error())
-
-	return strings.Contains(message, "exceeds available space") ||
-		strings.Contains(message, "does not fit existing region") ||
-		strings.Contains(message, "plus the rebuilt seekhead exceeds available space")
+	return strings.Contains(message, "use full rewrite instead") ||
+		strings.Contains(message, "does not fit existing region")
 }
 
 func copyAndroidFileToTemp(fd int64, path string) error {
@@ -171,7 +175,45 @@ func copyAndroidFileToTemp(fd int64, path string) error {
 	return nil
 }
 
-func copyTempFileToAndroid(fd int64, path string) error {
+func restoreAndroidFile(fd int64, backupPath string) error {
+	src, err := os.Open(backupPath)
+	if err != nil {
+		return fmt.Errorf("open original-file backup: %w", err)
+	}
+	defer src.Close()
+
+	dst, err := dupFile(fd, "android-restore")
+	if err != nil {
+		return err
+	}
+	defer dst.Close()
+
+	if _, err := src.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("seek original-file backup: %w", err)
+	}
+	if err := dst.Truncate(0); err != nil {
+		return fmt.Errorf("truncate destination during restore: %w", err)
+	}
+	if _, err := dst.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("seek destination during restore: %w", err)
+	}
+	if _, err := io.Copy(dst, src); err != nil {
+		return fmt.Errorf("restore original file contents: %w", err)
+	}
+	if err := dst.Sync(); err != nil {
+		return fmt.Errorf("sync restored original file: %w", err)
+	}
+	return nil
+}
+
+func restoreAfterCopyFailure(fd int64, backupPath string, cause error) error {
+	if restoreErr := restoreAndroidFile(fd, backupPath); restoreErr != nil {
+		return fmt.Errorf("%v; restoring the original file also failed: %w", cause, restoreErr)
+	}
+	return cause
+}
+
+func copyTempFileToAndroid(fd int64, path string, backupPath string) error {
 	src, err := os.Open(path)
 	if err != nil {
 		return fmt.Errorf("open rewritten file: %w", err)
@@ -187,23 +229,21 @@ func copyTempFileToAndroid(fd int64, path string) error {
 	if _, err := src.Seek(0, io.SeekStart); err != nil {
 		return fmt.Errorf("seek rewritten file: %w", err)
 	}
-
-	if err := dst.Truncate(0); err != nil {
-		return fmt.Errorf("truncate destination: %w", err)
-	}
-
 	if _, err := dst.Seek(0, io.SeekStart); err != nil {
 		return fmt.Errorf("seek destination: %w", err)
 	}
-
+	if err := dst.Truncate(0); err != nil {
+		return restoreAfterCopyFailure(fd, backupPath, fmt.Errorf("truncate destination: %w", err))
+	}
+	if _, err := dst.Seek(0, io.SeekStart); err != nil {
+		return restoreAfterCopyFailure(fd, backupPath, fmt.Errorf("seek destination after truncation: %w", err))
+	}
 	if _, err := io.Copy(dst, src); err != nil {
-		return fmt.Errorf("copy rewritten file to destination: %w", err)
+		return restoreAfterCopyFailure(fd, backupPath, fmt.Errorf("copy rewritten file to destination: %w", err))
 	}
-
 	if err := dst.Sync(); err != nil {
-		return fmt.Errorf("sync destination: %w", err)
+		return restoreAfterCopyFailure(fd, backupPath, fmt.Errorf("sync rewritten destination: %w", err))
 	}
-
 	return nil
 }
 
@@ -249,7 +289,7 @@ func fullRewrite(
 		return fmt.Errorf("full metadata rewrite: %w", err)
 	}
 
-	if err := copyTempFileToAndroid(fd, outputPath); err != nil {
+	if err := copyTempFileToAndroid(fd, outputPath, sourcePath); err != nil {
 		return err
 	}
 
@@ -288,21 +328,27 @@ func EditChapters(fd int64, tempDir string, requestJSON string) error {
 	}
 
 	req.Title = strings.TrimSpace(req.Title)
-
 	if req.Title == "" {
 		return fmt.Errorf("chapter name cannot be empty")
 	}
 
-	var timingErr error
+	// Validate the timing before calling EditInPlace. The library's edit callback
+	// cannot return an error, so validating inside it would still rewrite the
+	// original metadata even when the requested range is invalid.
+	probe, err := matroska.OpenMetaWithFS(
+		context.Background(),
+		"android-document",
+		androidFS(fd),
+	)
+	if err != nil {
+		return fmt.Errorf("inspect video metadata: %w", err)
+	}
+	startMs, endMs, err := chapterTiming(probe.DurationMs, req)
+	if err != nil {
+		return err
+	}
 
-	err := editMetadata(fd, tempDir, func(c *matroska.Container) {
-		var startMs, endMs int64
-
-		startMs, endMs, timingErr = chapterTiming(c.DurationMs, req)
-		if timingErr != nil {
-			return
-		}
-
+	return editMetadata(fd, tempDir, func(c *matroska.Container) {
 		newChapter := matroska.Chapter{
 			Title:   req.Title,
 			StartMs: startMs,
@@ -311,7 +357,6 @@ func EditChapters(fd int64, tempDir string, requestJSON string) error {
 
 		updated := make([]matroska.Chapter, 0, len(c.Chapters)+1)
 		replaced := false
-
 		for _, chapter := range c.Chapters {
 			if chapter.Title == req.Title &&
 				chapter.StartMs == startMs &&
@@ -322,7 +367,6 @@ func EditChapters(fd int64, tempDir string, requestJSON string) error {
 				updated = append(updated, chapter)
 			}
 		}
-
 		if !replaced {
 			updated = append(updated, newChapter)
 		}
@@ -330,19 +374,18 @@ func EditChapters(fd int64, tempDir string, requestJSON string) error {
 		sort.SliceStable(updated, func(i, j int) bool {
 			return updated[i].StartMs < updated[j].StartMs
 		})
-
 		c.Chapters = updated
 	})
+}
 
-	if err != nil {
-		return err
+func subtitleTrackPositions(c *matroska.Container) []int {
+	positions := make([]int, 0)
+	for i := range c.Tracks {
+		if c.Tracks[i].Type == matroska.SubtitleTrack {
+			positions = append(positions, i)
+		}
 	}
-
-	if timingErr != nil {
-		return timingErr
-	}
-
-	return nil
+	return positions
 }
 
 func InspectSubtitleTracks(fd int64) (string, error) {
@@ -390,37 +433,54 @@ func EditSubtitleTracks(fd int64, tempDir string, requestJSON string) error {
 	if err := json.Unmarshal([]byte(requestJSON), &req); err != nil {
 		return fmt.Errorf("invalid subtitle edit request: %w", err)
 	}
-
 	if req.SubtitleIndex < 1 {
 		return fmt.Errorf("subtitle index must be at least 1")
 	}
+	if req.NewPosition < 1 {
+		return fmt.Errorf("subtitle position must be at least 1")
+	}
+	switch req.DefaultMode {
+	case "", "keep", "default", "not_default":
+	default:
+		return fmt.Errorf("invalid subtitle default mode: %s", req.DefaultMode)
+	}
 
-	if req.NewPosition < 0 {
-		return fmt.Errorf("subtitle position cannot be negative")
+	// Check both positions before editing anything. Files in the same folder
+	// may not all contain the same number of subtitle tracks.
+	probe, err := matroska.OpenMetaWithFS(
+		context.Background(),
+		"android-document",
+		androidFS(fd),
+	)
+	if err != nil {
+		return fmt.Errorf("inspect subtitle tracks: %w", err)
+	}
+	probePositions := subtitleTrackPositions(probe)
+	if req.SubtitleIndex > len(probePositions) {
+		return fmt.Errorf(
+			"subtitle track %d does not exist; file has %d subtitle tracks",
+			req.SubtitleIndex,
+			len(probePositions),
+		)
+	}
+	if req.NewPosition > len(probePositions) {
+		return fmt.Errorf(
+			"subtitle position %d is out of range; file has %d subtitle tracks",
+			req.NewPosition,
+			len(probePositions),
+		)
 	}
 
 	var editErr error
-
-	err := editMetadata(fd, tempDir, func(c *matroska.Container) {
-		subtitlePositions := make([]int, 0)
-
-		for i := range c.Tracks {
-			if c.Tracks[i].Type == matroska.SubtitleTrack {
-				subtitlePositions = append(subtitlePositions, i)
-			}
-		}
-
-		if req.SubtitleIndex > len(subtitlePositions) {
-			editErr = fmt.Errorf(
-				"subtitle track %d does not exist; file has %d subtitle tracks",
-				req.SubtitleIndex,
-				len(subtitlePositions),
-			)
+	err = editMetadata(fd, tempDir, func(c *matroska.Container) {
+		subtitlePositions := subtitleTrackPositions(c)
+		if req.SubtitleIndex > len(subtitlePositions) ||
+			req.NewPosition > len(subtitlePositions) {
+			editErr = fmt.Errorf("subtitle track layout changed while editing")
 			return
 		}
 
 		target := subtitlePositions[req.SubtitleIndex-1]
-
 		if req.ChangeName {
 			c.Tracks[target].Name = req.Name
 		}
@@ -431,83 +491,40 @@ func EditSubtitleTracks(fd int64, tempDir string, requestJSON string) error {
 				c.Tracks[pos].IsDefault = false
 			}
 			c.Tracks[target].IsDefault = true
-
 		case "not_default":
 			c.Tracks[target].IsDefault = false
 		}
 
-		if req.NewPosition < 1 ||
-			req.NewPosition > len(subtitlePositions) ||
-			req.NewPosition == req.SubtitleIndex {
+		if req.NewPosition == req.SubtitleIndex {
 			return
 		}
 
-		subtitleTracks := make(
-			[]matroska.Track,
-			0,
-			len(subtitlePositions),
-		)
-
+		subtitleTracks := make([]matroska.Track, 0, len(subtitlePositions))
 		for _, pos := range subtitlePositions {
-			subtitleTracks = append(
-				subtitleTracks,
-				c.Tracks[pos],
-			)
+			subtitleTracks = append(subtitleTracks, c.Tracks[pos])
 		}
 
-		moved := subtitleTracks[req.SubtitleIndex-1]
-
-		remaining := make(
-			[]matroska.Track,
-			0,
-			len(subtitleTracks)-1,
-		)
-
-		for i, track := range subtitleTracks {
-			if i != req.SubtitleIndex-1 {
-				remaining = append(remaining, track)
-			}
-		}
-
-		insertAt := req.NewPosition - 1
-
-		reordered := make(
-			[]matroska.Track,
-			0,
-			len(subtitleTracks),
-		)
-
-		remainingIndex := 0
-
-		for i := 0; i < len(subtitleTracks); i++ {
-			if i == insertAt {
-				reordered = append(reordered, moved)
-			} else {
-				reordered = append(
-					reordered,
-					remaining[remainingIndex],
-				)
-				remainingIndex++
-			}
-		}
+		from := req.SubtitleIndex - 1
+		to := req.NewPosition - 1
+		moved := subtitleTracks[from]
+		subtitleTracks = append(subtitleTracks[:from], subtitleTracks[from+1:]...)
+		subtitleTracks = append(subtitleTracks, matroska.Track{})
+		copy(subtitleTracks[to+1:], subtitleTracks[to:])
+		subtitleTracks[to] = moved
 
 		subtitleIndex := 0
-
 		for i := range c.Tracks {
 			if c.Tracks[i].Type == matroska.SubtitleTrack {
-				c.Tracks[i] = reordered[subtitleIndex]
+				c.Tracks[i] = subtitleTracks[subtitleIndex]
 				subtitleIndex++
 			}
 		}
 	})
-
 	if err != nil {
 		return err
 	}
-
 	if editErr != nil {
 		return editErr
 	}
-
 	return nil
 }

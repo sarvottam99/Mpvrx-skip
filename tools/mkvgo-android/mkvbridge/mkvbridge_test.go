@@ -177,15 +177,30 @@ func TestChapterTimingLastClampsToDuration(t *testing.T) {
 	}
 }
 
-func TestChapterTimingRejectsZeroLength(t *testing.T) {
+func TestChapterTimingRejectsInvalidSeconds(t *testing.T) {
 	_, _, err := chapterTiming(
 		600000,
 		chapterRequest{
-			Mode: "first",
+			Mode:    "first",
+			Minutes: 1,
+			Seconds: 60,
 		},
 	)
-
 	if err == nil {
-		t.Fatal("expected zero-length chapter error")
+		t.Fatal("expected seconds outside 0..59 to be rejected")
+	}
+}
+
+func TestChapterTimingRejectsNegativeRangeMinutes(t *testing.T) {
+	_, _, err := chapterTiming(
+		600000,
+		chapterRequest{
+			Mode:         "range",
+			StartMinutes: -1,
+			EndMinutes:   2,
+		},
+	)
+	if err == nil {
+		t.Fatal("expected negative chapter minutes to be rejected")
 	}
 }

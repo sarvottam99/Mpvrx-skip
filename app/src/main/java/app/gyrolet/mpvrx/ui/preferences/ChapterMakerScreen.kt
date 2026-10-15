@@ -334,6 +334,7 @@ object ChapterMakerScreen : Screen {
 
                 var success = 0
                 var failed = 0
+                val failureDetails = mutableListOf<String>()
 
                 files.forEachIndexed { index, file ->
                   withContext(Dispatchers.Main.immediate) {
@@ -353,14 +354,18 @@ object ChapterMakerScreen : Screen {
                         file,
                       ) { pfd ->
                         BatchEditorBridge.editChapters(
+                          context.applicationContext,
                           pfd,
                           request,
                         )
                       }
                     }
                     success++
-                  } catch (_: Exception) {
+                  } catch (e: Exception) {
                     failed++
+                    if (failureDetails.size < 5) {
+                      failureDetails += "${file.name.orEmpty()}: ${e.localizedMessage ?: "Unknown error"}"
+                    }
                   }
                 }
 
@@ -370,6 +375,12 @@ object ChapterMakerScreen : Screen {
                     success,
                     failed,
                   )
+                if (failureDetails.isNotEmpty()) {
+                  status += "\n" + failureDetails.joinToString("\n")
+                  if (failed > failureDetails.size) {
+                    status += "\n… and ${failed - failureDetails.size} more failure(s)"
+                  }
+                }
               } catch (e: Exception) {
                 error = e.localizedMessage ?: "Chapter editing failed"
               } finally {
