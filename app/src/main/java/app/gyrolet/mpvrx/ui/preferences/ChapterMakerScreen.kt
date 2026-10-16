@@ -593,7 +593,7 @@ object ChapterMakerScreen : Screen {
           },
           enabled =
             !running &&
-              folderUri.isNotBlank() &&
+              (folderUri.isNotBlank() || fileUri.isNotBlank()) &&
               chapterName.isNotBlank() &&
               timingValid,
           modifier = Modifier.fillMaxWidth(),
@@ -603,7 +603,7 @@ object ChapterMakerScreen : Screen {
 
         OutlinedButton(
           onClick = { showWipeConfirmation = true },
-          enabled = !running && folderUri.isNotBlank(),
+          enabled = !running && (folderUri.isNotBlank() || fileUri.isNotBlank()),
           modifier = Modifier.fillMaxWidth(),
         ) {
           Text(context.getString(R.string.chapter_maker_wipe_chapters))
