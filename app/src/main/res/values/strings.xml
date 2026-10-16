@@ -795,7 +795,7 @@
   <string name="chapter_maker_last">For the last</string>
   <string name="chapter_maker_specific_range">Specific timestamp</string>
   <string name="chapter_maker_processing">Processing…</string>
-  <string name="chapter_maker_apply">Apply to Folder</string>
+  <string name="chapter_maker_apply">Apply</string>
   <string name="subtitle_editor_title">Subtitle Editor</string>
   <string name="subtitle_editor_summary">Edit subtitle names, defaults, and track order</string>
   <string name="pref_rar_extractor_title">Recursive RAR Extractor</string>
@@ -2858,10 +2858,10 @@ Files extracted: %4$d</string>
   <string name="subtitle_editor_processing">Processing…</string>
   <string name="subtitle_editor_progress">%1$d / %2$d: %3$s</string>
   <string name="subtitle_editor_result">Completed: %1$d succeeded, %2$d failed</string>
-  <string name="subtitle_editor_apply">Apply to Folder</string>
+  <string name="subtitle_editor_apply">Apply</string>
 
   <string name="chapter_maker_wipe_chapters">Wipe Chapters</string>
   <string name="chapter_maker_wipe_title">Wipe all chapters?</string>
-  <string name="chapter_maker_wipe_message">This permanently removes all chapter markers from every Matroska video in the selected folder and its subfolders. Video, audio, subtitles, and other tracks are preserved. Continue?</string>
+  <string name="chapter_maker_wipe_message">This permanently removes all chapter markers from the selected folder and its subfolders, or the selected file. Video, audio, subtitles, and other tracks are preserved. Continue?</string>
   <string name="chapter_maker_wipe_confirm">Wipe chapters</string>
 </resources>
