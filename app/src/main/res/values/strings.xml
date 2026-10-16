@@ -787,6 +787,8 @@
   <string name="chapter_maker_summary">Add chapters to videos in a folder and its subfolders</string>
   <string name="chapter_maker_select_folder">Select Folder</string>
   <string name="chapter_maker_change_folder">Change Folder</string>
+  <string name="chapter_maker_select_file">Select a File</string>
+  <string name="chapter_maker_change_file">Change File</string>
   <string name="chapter_maker_chapter_name">Chapter name</string>
   <string name="chapter_maker_timing">Chapter timing</string>
   <string name="chapter_maker_first">For the first</string>
@@ -2837,6 +2839,8 @@ Files extracted: %4$d</string>
   <string name="chapter_maker_result">Completed: %1$d succeeded, %2$d failed</string>
 
   <string name="subtitle_editor_select_folder">Select Folder</string>
+  <string name="subtitle_editor_select_file">Select a File</string>
+  <string name="subtitle_editor_change_file">Change File</string>
   <string name="subtitle_editor_change_folder">Change Folder</string>
   <string name="subtitle_editor_scanning">Scanning subtitle tracks…</string>
   <string name="subtitle_editor_no_videos">No MKV/WebM videos found.</string>

@@ -76,6 +76,8 @@ object ChapterMakerScreen : Screen {
 
     var folderUri by rememberSaveable { mutableStateOf("") }
     var folderName by rememberSaveable { mutableStateOf("") }
+    var fileUri by rememberSaveable { mutableStateOf("") }
+    var fileName by rememberSaveable { mutableStateOf("") }
 
     var chapterName by rememberSaveable { mutableStateOf("Intro") }
     var timingMode by rememberSaveable { mutableStateOf("first") }
@@ -114,10 +116,43 @@ object ChapterMakerScreen : Screen {
               ?.name
               ?: uri.lastPathSegment.orEmpty()
 
+          fileUri = ""
+          fileName = ""
+
           status = ""
           error = ""
         } catch (e: Exception) {
           error = e.localizedMessage ?: "Could not access folder"
+        }
+      }
+
+    val filePicker =
+      rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+      ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+
+        try {
+          context.contentResolver.takePersistableUriPermission(
+            uri,
+            Intent.FLAG_GRANT_READ_URI_PERMISSION or
+              Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+          )
+
+          fileUri = uri.toString()
+          fileName =
+            DocumentFile
+              .fromSingleUri(context, uri)
+              ?.name
+              ?: uri.lastPathSegment.orEmpty()
+
+          folderUri = ""
+          folderName = ""
+
+          status = ""
+          error = ""
+        } catch (e: Exception) {
+          error = e.localizedMessage ?: "Could not access file"
         }
       }
 
@@ -126,7 +161,14 @@ object ChapterMakerScreen : Screen {
     }
 
     fun startWipeChapters() {
-      if (folderUri.isBlank() || running) return
+      if (
+        folderUri.isBlank() &&
+        fileUri.isBlank()
+      ) {
+        return
+      }
+
+      if (running) return
       showWipeConfirmation = false
 
       scope.launch {
@@ -135,13 +177,27 @@ object ChapterMakerScreen : Screen {
         error = ""
 
         try {
-          val root =
-            DocumentFile.fromTreeUri(context, Uri.parse(folderUri))
-              ?: kotlin.error("Selected folder is no longer available")
-
           val files =
-            withContext(Dispatchers.IO) {
-              BatchEditorFileUtils.collectMatroskaVideos(root)
+            if (fileUri.isNotBlank()) {
+              val file =
+                DocumentFile.fromSingleUri(
+                  context,
+                  Uri.parse(fileUri),
+                )
+                  ?: kotlin.error("Selected file is no longer available")
+
+              listOf(file)
+            } else {
+              val root =
+                DocumentFile.fromTreeUri(
+                  context,
+                  Uri.parse(folderUri),
+                )
+                  ?: kotlin.error("Selected folder is no longer available")
+
+              withContext(Dispatchers.IO) {
+                BatchEditorFileUtils.collectMatroskaVideos(root)
+              }
             }
 
           if (files.isEmpty()) {
@@ -276,8 +332,10 @@ object ChapterMakerScreen : Screen {
 
         Text(
           text =
-            folderName.ifBlank {
-              context.getString(R.string.batch_folder_not_selected)
+            when {
+              fileName.isNotBlank() -> fileName
+              folderName.isNotBlank() -> folderName
+              else -> context.getString(R.string.batch_folder_not_selected)
             },
           style = MaterialTheme.typography.titleMedium,
         )
@@ -297,6 +355,33 @@ object ChapterMakerScreen : Screen {
               context.getString(R.string.chapter_maker_select_folder)
             } else {
               context.getString(R.string.chapter_maker_change_folder)
+            },
+          )
+        }
+
+        OutlinedButton(
+          onClick = {
+            filePicker.launch(
+              arrayOf(
+                "video/x-matroska",
+                "video/webm",
+                "video/*",
+              ),
+            )
+          },
+          enabled = !running,
+          modifier = Modifier.fillMaxWidth(),
+        ) {
+          Icon(
+            Icons.RoundedFilled.Folder,
+            contentDescription = null,
+          )
+          Spacer(Modifier.size(8.dp))
+          Text(
+            if (fileUri.isBlank()) {
+              context.getString(R.string.chapter_maker_select_file)
+            } else {
+              context.getString(R.string.chapter_maker_change_file)
             },
           )
         }
@@ -401,21 +486,32 @@ object ChapterMakerScreen : Screen {
               error = ""
 
               try {
-                val root =
-                  DocumentFile.fromTreeUri(
-                    context,
-                    Uri.parse(folderUri),
-                  )
-                    ?: kotlin.error("Selected folder is no longer available")
-
                 if (chapterName.isBlank()) {
                   kotlin.error("Chapter name cannot be empty")
                   return@launch
                 }
 
                 val files =
-                  withContext(Dispatchers.IO) {
-                    BatchEditorFileUtils.collectMatroskaVideos(root)
+                  if (fileUri.isNotBlank()) {
+                    val file =
+                      DocumentFile.fromSingleUri(
+                        context,
+                        Uri.parse(fileUri),
+                      )
+                        ?: kotlin.error("Selected file is no longer available")
+
+                    listOf(file)
+                  } else {
+                    val root =
+                      DocumentFile.fromTreeUri(
+                        context,
+                        Uri.parse(folderUri),
+                      )
+                        ?: kotlin.error("Selected folder is no longer available")
+
+                    withContext(Dispatchers.IO) {
+                      BatchEditorFileUtils.collectMatroskaVideos(root)
+                    }
                   }
 
                 if (files.isEmpty()) {
