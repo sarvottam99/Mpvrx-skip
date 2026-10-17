@@ -85,7 +85,12 @@ internal class GitHubContributorsRepository(
   suspend fun activeContributors(forceRefresh: Boolean = false): Result<List<GitHubContributor>> =
     cachedCredits("active_contributors", GitHubContributor.serializer(), forceRefresh) {
       val since = Instant.now().minus(90, ChronoUnit.DAYS).toString()
-      fetchPages("commits", GitHubCommitResponse.serializer(), mapOf("since" to since))
+      fetchPages(
+        "commits",
+        GitHubCommitResponse.serializer(),
+        mapOf("since" to since),
+        baseUrl = ACTIVE_API_URL,
+      )
         .distinctBy { it.sha }
         .mapNotNull { it.author?.takeIf(GitHubUserResponse::isPerson) }
         .groupBy { it.login.lowercase(Locale.ROOT) }
@@ -180,11 +185,12 @@ internal class GitHubContributorsRepository(
     endpoint: String,
     serializer: KSerializer<T>,
     parameters: Map<String, String> = emptyMap(),
+    baseUrl: String = API_URL,
   ): List<T> {
     val entries = mutableListOf<T>()
     var pageNumber = 1
     do {
-      val url = "$API_URL/$endpoint".toHttpUrl().newBuilder()
+      val url = "$baseUrl/$endpoint".toHttpUrl().newBuilder()
         .addQueryParameter("per_page", PAGE_SIZE.toString())
         .addQueryParameter("page", pageNumber.toString())
       parameters.forEach { (name, value) -> url.addQueryParameter(name, value) }
@@ -251,6 +257,7 @@ internal class GitHubContributorsRepository(
 
   private companion object {
     const val API_URL = "https://api.github.com/repos/Riteshp2001/mpvRx"
+    const val ACTIVE_API_URL = "https://api.github.com/repos/sarvottam99/mpvRx-skip"
     const val PAGE_SIZE = 100
     const val CACHE_TTL_MS = 24L * 60L * 60L * 1_000L
     val contributorOrder = compareByDescending<GitHubContributor> { it.contributions }

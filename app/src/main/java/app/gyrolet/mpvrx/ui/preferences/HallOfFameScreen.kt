@@ -235,7 +235,7 @@ object HallOfFameScreen : Screen {
             state = remainingActive,
             itemKey = { it.profileUrl ?: it.displayName },
             onRetry = { refreshRequest++ },
-            activityUrl = "$githubRepoUrl/commits",
+            activityUrl = "https://github.com/sarvottam99/mpvRx-skip/commits",
           ) { contributor ->
             HallOfFamePerson(
               name = contributor.displayName,
